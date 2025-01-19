@@ -2,5 +2,7 @@
 name = "buf_read_splitter"
 version = "0.1.0"
 edition = "2021"
-
+exclude = [
+  ".gitignore",
+]
 [dependencies]

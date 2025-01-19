@@ -7,6 +7,5 @@ repository="https://github.com/flogbl/buf_read_splitter"
 license-file="LICENSE"
 exclude = [
   ".gitignore",
-  ".cargo_vcs_info.json",
 ]
 [dependencies]

@@ -1,3 +1,4 @@
+use core::fmt;
 use std::{cmp, io::Read};
 
 use crate::fifo::Fifo;
@@ -255,6 +256,32 @@ impl<'a> Read for BufReadSplitter<'a> {
             }
         }
         return Ok(sz_send);
+    }
+}
+
+impl<'a> fmt::Debug for BufReadSplitter<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        #[derive(Debug)]
+        #[allow(dead_code)]
+        struct BufReadSplitterDEBUG {
+            buffer_sz: usize,
+            fifo: String,
+            sep: Vec<u8>,
+            found_sz: usize,
+            found_nextpos: usize,
+        }
+
+        // per Chayim Friedman’s suggestion
+        fmt::Debug::fmt(
+            &BufReadSplitterDEBUG {
+                buffer_sz: self.buffer_sz,
+                fifo: format!("{:?}", self.fifo),
+                sep: self.sep.clone(),
+                found_sz: self.found_sz,
+                found_nextpos: self.found_nextpos,
+            },
+            f,
+        )
     }
 }
 

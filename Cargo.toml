@@ -1,12 +1,10 @@
 [package]
 name = "buf_read_splitter"
-version = "0.1.1"
+version = "0.2.0"
 edition = "2021"
-description="BufReadSplitter is a buffer split reader. It's like read_until but the separator can be more than one byte, also this separator is not returned (the buffer stop just before it)"
-repository="https://github.com/flogbl/buf_read_splitter"
-license="MIT"
-license-file="LICENSE"
-exclude = [
-  ".gitignore",
-]
+description = "BufReadSplitter can read a buffer giving an array as separator, stopping before each one encounter. The separator can be updated on the fly."
+repository = "https://github.com/flogbl/buf_read_splitter"
+license = "MIT"
+license-file = "LICENSE"
+exclude = [".gitignore"]
 [dependencies]

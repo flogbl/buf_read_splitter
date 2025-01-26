@@ -142,4 +142,4 @@
 //!
 //! Its functions are not thread safe as-is, a Mutex has to be explicitly used.
 pub mod buf_read_splitter;
-mod fifo;
+mod from_v2;

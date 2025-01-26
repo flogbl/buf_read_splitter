@@ -95,13 +95,11 @@ mod tests {
 
     #[test]
     fn test_common() {
-        for _ in 0..100 {
             for i in 1..100 {
                 for j in 1..100 {
                     sub_test_common(i, j);
                 }
             }
-        }
     }
     fn sub_test_common(buf_split: usize, buf_ext: usize) {
         let input = "First<SEP><SEP>X<SEP>Second<SEP2>Y<SEP2>Small<>0<>Bigger<SEPARATOR_03>Till the end...<end>The last!".to_string();

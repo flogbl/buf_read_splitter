@@ -15,7 +15,7 @@ impl<'a> BufReadSplitter<'a> {
     pub fn new(reader: &'a mut dyn std::io::Read, options: Options) -> Self {
         Self {
             reader,
-            buf_extend: Vec::new(),
+            buf_extend: Vec::with_capacity(options.initiale_sz_to_match),
             options,
             matched: false,
         }

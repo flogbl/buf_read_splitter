@@ -1,12 +1,11 @@
+use buf_read_splitter_new::buf_read_splitter as from_v2;
 use core::fmt;
-use std::{cmp, io::Read};
-
-use crate::from_v2;
+use std::io::Read;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 pub struct BufReadSplitter<'a> {
-    bfs: from_v2::BufReadSplitter__new<'a>,
+    bfs: from_v2::BufReadSplitter<'a>,
     need_next: bool,
     last_sz_read: usize,
     last_matched: bool,
@@ -18,7 +17,7 @@ impl<'a> BufReadSplitter<'a> {
     /// The `buffer_sz` parameter is the reserved size used to communicate between input buffer and output buffer
     /// (but the output buffer will of course be fill as much as possible)
     pub fn new(buffer_sz: usize, reader: &'a mut dyn std::io::Read, sep: &[u8]) -> Self {
-        let mut bfs = from_v2::BufReadSplitter__new::<'a>::new(
+        let mut bfs = from_v2::BufReadSplitter::<'a>::new(
             reader,
             from_v2::Options::default()
                 .set_initiale_sz_to_match(buffer_sz)
@@ -45,7 +44,7 @@ impl<'a> BufReadSplitter<'a> {
             let mut buf = [0u8; 100];
             while self.need_next == false {
                 match self.read(&mut buf) {
-                    Ok(o) => {}
+                    Ok(_o) => {}
                     Err(err) => return Some(Err(err.into())),
                 }
             }
@@ -95,11 +94,11 @@ mod tests {
 
     #[test]
     fn test_common() {
-            for i in 1..100 {
-                for j in 1..100 {
-                    sub_test_common(i, j);
-                }
+        for i in 1..100 {
+            for j in 1..100 {
+                sub_test_common(i, j);
             }
+        }
     }
     fn sub_test_common(buf_split: usize, buf_ext: usize) {
         let input = "First<SEP><SEP>X<SEP>Second<SEP2>Y<SEP2>Small<>0<>Bigger<SEPARATOR_03>Till the end...<end>The last!".to_string();

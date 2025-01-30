@@ -409,7 +409,7 @@ mod tests {
     #[test]
     fn test_sep_partial() {
         for i in 1..1000 {
-            sub_test_sep_first_pos(i);
+            sub_test_sep_partial(i);
         }
     }
     fn sub_test_sep_partial(buf_sz: usize) {

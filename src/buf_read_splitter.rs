@@ -28,13 +28,7 @@ impl<'a> BufReadSplitter<'a> {
     ///
     /// Change the match pattern
     pub fn set_array_to_match(&mut self, to_match: &[u8]) {
-        //TODO: Optimize
-        if self.options.to_match.capacity() < to_match.len() {
-            let diff = to_match.len() - self.options.to_match.capacity();
-            self.options.to_match.reserve(diff);
-        }
-        unsafe { self.options.to_match.set_len(to_match.len()) };
-        self.options.to_match.copy_from_slice(to_match);
+        self.options.set_array_to_match(to_match);
     }
     ///
     /// Unstack the buffer extender
@@ -47,24 +41,19 @@ impl<'a> BufReadSplitter<'a> {
     ///
     /// Read the buffer pushing in the buffer extender
     /// Return the position where news datas from the "read" starts
-    fn read_in_buf_extend_at_end(&mut self) -> std::io::Result<(usize,usize)> {
+    fn read_in_buf_extend_at_end(&mut self) -> std::io::Result<(usize, usize)> {
         if self.buf_extend.capacity() < self.buf_extend.len() + self.options.chunk_sz {
             self.buf_extend.reserve(self.options.chunk_sz);
         }
 
         let start = self.buf_extend.len();
 
-        unsafe {
-            self.buf_extend
-                .set_len(self.buf_extend.len() + self.options.chunk_sz);
-        }
-
+        //TODO: Read from a buffer into a vector --> Optimizable?
+        self.buf_extend.resize(start + self.options.chunk_sz, 0);
         let sz_read = self.reader.read(&mut self.buf_extend[start..])?;
-
         if start + sz_read < self.buf_extend.len() {
-            unsafe {
-                self.buf_extend.set_len(start + sz_read);
-            }
+            // Not all the buffer has been filling, so resize
+            self.buf_extend.resize(start + sz_read, 0);
         }
 
         // Return the position of the readed part
@@ -232,12 +221,9 @@ impl Options {
     ///
     /// The pattern to found
     pub fn set_array_to_match(&mut self, to_match: &[u8]) {
-        if self.to_match.capacity() < to_match.len() {
-            let diff = to_match.len() - self.to_match.capacity();
-            self.to_match.reserve(diff);
-        }
-        unsafe { self.to_match.set_len(to_match.len()) };
-        self.to_match.copy_from_slice(to_match);
+        //TODO: Change value of a Vector --> Optimizable?
+        self.to_match.clear();
+        self.to_match.extend(to_match);
     }
     ///
     /// Set the initiale size of the pattern to match
@@ -405,7 +391,7 @@ mod tests {
         }
         assert_eq!(i, 3, "Missing iterations for {buf_sz}")
     }
-    
+
     #[test]
     fn test_sep_partial() {
         for i in 1..1000 {

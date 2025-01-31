@@ -8,10 +8,14 @@ Example :
 use buf_read_splitter::buf_read_splitter::{BufReadSplitter,Options};
 use std::io::Read;
 
+// Using a String to simulate a buffer
 let input = "First<SEP><SEP>X<SEP>Second<SEP>Third<SEP>The last!".to_string();
 let mut input_reader = input.as_bytes();
 
+// Create a buffer reader 
 let mut reader = BufReadSplitter::new(&mut input_reader, Options::default());
+
+// Set the split pattern
 reader.set_array_to_match("<SEP>".as_bytes());
 
 let mut i = 0;
@@ -22,10 +26,11 @@ loop {
     
     let str = String::from_utf8_lossy(&buf[..sz]);
     text.push_str(&str);
-    
-    if reader.matched() || sz == 0 {
+
+    // Matching the separator or end of buffer :
+    if reader.matched() || sz == 0 { 
         i += 1;
-        // Matching the separator or  end of the buffer
+
         match i {
             1 => assert_eq!(text, "First", "Case 1"),
             2 => assert_eq!(text, "", "Case 2"),
@@ -35,7 +40,7 @@ loop {
             6 => assert_eq!(text, "The last!", "Case 10"),
             _ => assert_eq!(false, true, "Overflow"),
         }
-        // End of the buffer case
+        // End of the buffer :
         if reader.matched() == false {
             break;
         }

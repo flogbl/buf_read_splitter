@@ -36,13 +36,12 @@
 //!     // Go to next part if there's one and if there's no error
 //!     sz == 0 && reader.next_part().unwrap() == Some(())
 //! } {}
-//! ```
-//! Output :
-//! ```
-//! First *end*
-//! Second *end*
-//! Third *end*
-//! The last one ! *end*
+//!
+//! // Output :
+//! //   First *end*
+//! //   Second *end*
+//! //   Third *end*
+//! //   The last one ! *end*
 //! ```
 
 pub mod buf_read_splitter;

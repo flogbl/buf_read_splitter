@@ -10,16 +10,19 @@ pub struct BufReadSplitter<'a> {
     buf_extend: Vec<u8>,
     options: Options,
     matched: bool,
+    curr_limit_read: Option<usize>,
 }
 ///
 /// Implementation
 impl<'a> BufReadSplitter<'a> {
     pub fn new(reader: &'a mut dyn std::io::Read, options: Options) -> Self {
+        let max_read = options.limit_read;
         Self {
             reader,
             buf_extend: Vec::with_capacity(options.initiale_sz_to_match),
             options,
             matched: false,
+            curr_limit_read: max_read,
         }
     }
     ///
@@ -31,6 +34,12 @@ impl<'a> BufReadSplitter<'a> {
     /// Change the match pattern
     pub fn stop_on(&mut self, to_match: &[u8]) {
         self.options.split_by(to_match);
+    }
+    ///
+    /// Set a limit of bytes to read of a buffer part
+    pub fn set_limit_read(&mut self, opt_sz: Option<usize>) {
+        self.options.set_limit_read(opt_sz);
+        self.curr_limit_read = opt_sz;
     }
     ///
     /// Unstack the buffer extender
@@ -97,7 +106,7 @@ impl<'a> BufReadSplitter<'a> {
             // Have to read until end of buffer or separator
             let mut buf = [0u8; 100];
             while {
-                let sz_read = match self.read(&mut buf) {
+                let sz_read = match self.internal_read(&mut buf) {
                     Ok(o) => o,
                     Err(err) => return Err(err.into()).into(),
                 };
@@ -109,21 +118,12 @@ impl<'a> BufReadSplitter<'a> {
         if self.matched == false {
             Ok(None) // At the end of the input buffer
         } else {
-            self.matched = false; // We are now on the next buffer, nothing ever read, nothing ever matched
+            self.matched = false; // We are now on the next buffer, nothing even read, nothing even matched
+            self.curr_limit_read = self.options.limit_read;
             Ok(Some(())) // It have been stopping because it reached the separator
         }
     }
-}
-///
-/// Read Implementation
-impl<'a> Read for BufReadSplitter<'a> {
-    ///
-    /// Read until the begin of a match or end of the buffer
-    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        if self.matched == true {
-            return Ok(0); // Must call next first !
-        }
-
+    fn internal_read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         let mut sz_output = 0;
         if self.buf_extend.len() > 0 {
             sz_output = Self::pop_buf_extend(&mut self.buf_extend, buf)
@@ -208,6 +208,30 @@ impl<'a> Read for BufReadSplitter<'a> {
     }
 }
 ///
+/// Read Implementation
+impl<'a> Read for BufReadSplitter<'a> {
+    ///
+    /// Read until the begin of a match or end of the buffer
+    fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+        if self.matched == true {
+            return Ok(0); // Must call next first !
+        }
+        if let Some(mr) = self.curr_limit_read {
+            let max = cmp::min(mr, buf.len());
+            if max == 0 {
+                Ok(0)
+            } else {
+                let buf_slice = &mut buf[..max];
+                let sz_read = self.internal_read(buf_slice)?;
+                self.curr_limit_read = Some(mr - sz_read);
+                Ok(sz_read)
+            }
+        } else {
+            self.internal_read(buf)
+        }
+    }
+}
+///
 /// For debug
 impl<'a> fmt::Debug for BufReadSplitter<'a> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
@@ -233,6 +257,7 @@ pub struct Options {
     initiale_sz_to_match: usize,
     chunk_sz: usize,
     to_match: Vec<u8>,
+    limit_read: Option<usize>,
 }
 ///
 /// Options implementations
@@ -245,6 +270,7 @@ impl Options {
             initiale_sz_to_match: approximate_pattern_sz,
             chunk_sz: 5,
             to_match: Vec::with_capacity(approximate_pattern_sz),
+            limit_read: None,
         }
     }
     ///
@@ -265,6 +291,12 @@ impl Options {
     /// Set the size of each extension of the extending buffer needed to read over the reading buffer
     pub fn set_extend_buffer_additionnal_sz(&mut self, sz: usize) -> &mut Self {
         self.chunk_sz = sz;
+        self
+    }
+    ///
+    /// Set a limit of bytes to read of a buffer part
+    pub fn set_limit_read(&mut self, opt_sz: Option<usize>) -> &mut Self {
+        self.limit_read = opt_sz;
         self
     }
 }
@@ -513,5 +545,89 @@ mod tests {
                 break;
             }
         }
+    }
+
+    #[test]
+    fn test_limit() {
+        let input = "First<SEP>Second<SEP>Third<SEP>Fourth<SEP>Fifth".to_string();
+        let mut input_reader = input.as_bytes();
+
+        let mut reader = BufReadSplitter::new(&mut input_reader, Options::default().clone());
+        reader.stop_on("<SEP>".as_bytes());
+
+        // Must take the separator into account, even if the limit fall in the middle of it
+        {
+            let mut buf = [0u8; 3];
+            reader.set_limit_read(Some(7));
+            let sz = reader.read(&mut buf).unwrap();
+            assert_eq!(&buf[0..sz], "Fir".as_bytes(), "Case 1a");
+
+            let sz = reader.read(&mut buf).unwrap();
+            assert_eq!(&buf[0..sz], "st".as_bytes(), "Case 1b");
+
+            let sz = reader.read(&mut buf).unwrap();
+            assert_eq!(&buf[0..sz], "".as_bytes(), "Case 1c");
+        }
+
+        reader.next_part().unwrap();
+
+        // Limit basic case
+        {
+            let mut buf = [0u8; 3];
+            reader.set_limit_read(Some(5));
+            let sz = reader.read(&mut buf).unwrap();
+            assert_eq!(&buf[0..sz], "Sec".as_bytes(), "Case 2a");
+
+            let sz = reader.read(&mut buf).unwrap();
+            assert_eq!(&buf[0..sz], "on".as_bytes(), "Case 2b");
+
+            let sz = reader.read(&mut buf).unwrap();
+            assert_eq!(&buf[0..sz], "".as_bytes(), "Case 2c");
+        }
+
+        reader.next_part().unwrap();
+
+        // Size of buffer larger than the limit
+        {
+            let mut buf = [0u8; 10];
+            reader.set_limit_read(Some(2));
+            let sz = reader.read(&mut buf).unwrap();
+            assert_eq!(&buf[0..sz], "Th".as_bytes(), "Case 3a");
+
+            let sz = reader.read(&mut buf).unwrap();
+            assert_eq!(&buf[0..sz], "".as_bytes(), "Case 3b");
+        }
+
+        reader.next_part().unwrap();
+
+        // Size of buffer = the limit
+        {
+            let mut buf = [0u8; 6];
+            reader.set_limit_read(Some(6));
+            let sz = reader.read(&mut buf).unwrap();
+            assert_eq!(&buf[0..sz], "Fourth".as_bytes(), "Case 4a");
+
+            let sz = reader.read(&mut buf).unwrap();
+            assert_eq!(&buf[0..sz], "".as_bytes(), "Case 4b");
+        }
+
+        reader.next_part().unwrap();
+
+        // Limit < End
+        {
+            let mut buf = [0u8; 3];
+            reader.set_limit_read(Some(10));
+            let sz = reader.read(&mut buf).unwrap();
+            assert_eq!(&buf[0..sz], "Fif".as_bytes(), "Case 5a");
+
+            let sz = reader.read(&mut buf).unwrap();
+            assert_eq!(&buf[0..sz], "th".as_bytes(), "Case 5b");
+
+            let sz = reader.read(&mut buf).unwrap();
+            assert_eq!(&buf[0..sz], "".as_bytes(), "Case 5b");
+        }
+
+        let opt = reader.next_part().unwrap();
+        assert_eq!(opt, None, "Case end");
     }
 }

@@ -1,6 +1,8 @@
 use core::fmt;
 use std::{cmp, io::Read};
 
+type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+
 ///
 /// BufReadSplitter : See unit test or lib documentations for an example
 pub struct BufReadSplitter<'a> {
@@ -27,8 +29,8 @@ impl<'a> BufReadSplitter<'a> {
     }
     ///
     /// Change the match pattern
-    pub fn set_array_to_match(&mut self, to_match: &[u8]) {
-        self.options.set_array_to_match(to_match);
+    pub fn stop_on(&mut self, to_match: &[u8]) {
+        self.options.split_by(to_match);
     }
     ///
     /// Unstack the buffer extender
@@ -69,7 +71,7 @@ impl<'a> BufReadSplitter<'a> {
                     line!(),
                     pos,
                     self.options.to_match.len()
-                )
+                );
             }
         }
         if pos == self.options.to_match.len()
@@ -84,16 +86,43 @@ impl<'a> BufReadSplitter<'a> {
             }
         }
     }
+    ///
+    /// next buffer part
+    pub fn next_part(&mut self) -> Result<Option<()>> {
+        // We choose to return a Result<Option<()>> to be  representative of this logic :
+        //   - call a function --> You have to manage an possible error
+        //   - ok there's no error --> So is there a next thing
+
+        if self.matched == false {
+            // Have to read until end of buffer or separator
+            let mut buf = [0u8; 100];
+            while {
+                let sz_read = match self.read(&mut buf) {
+                    Ok(o) => o,
+                    Err(err) => return Err(err.into()).into(),
+                };
+                // while condition :
+                self.matched == false && sz_read != 0
+            } {}
+        }
+
+        if self.matched == false {
+            Ok(None) // At the end of the input buffer
+        } else {
+            self.matched = false; // We are now on the next buffer, nothing ever read, nothing ever matched
+            Ok(Some(())) // It have been stopping because it reached the separator
+        }
+    }
 }
 ///
-/// Implementation
+/// Read Implementation
 impl<'a> Read for BufReadSplitter<'a> {
     ///
-    /// Read until the begin of a match`match()==true`, or end of the buffer (returned size = 0)
-    /// match()==true and returned size = 0 is not the end of the buffer
-    /// The end of the buffer is when : match()==false and returned size=0
+    /// Read until the begin of a match or end of the buffer
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        self.matched = false;
+        if self.matched == true {
+            return Ok(0); // Must call next first !
+        }
 
         let mut sz_output = 0;
         if self.buf_extend.len() > 0 {
@@ -103,6 +132,7 @@ impl<'a> Read for BufReadSplitter<'a> {
             sz_output += self.reader.read(&mut buf[sz_output..])?;
         }
         let mut sz_found = 0;
+        //TODO: Is it possible to factorize the two loops above ?
         for (i, el) in buf[..sz_output].iter().enumerate() {
             match self.sequel(el, sz_found) {
                 MatchResult::NeedNext => {
@@ -198,7 +228,6 @@ enum MatchResult {
 }
 ///
 /// Options for BufReadSplitter
-///
 #[derive(Clone)]
 pub struct Options {
     initiale_sz_to_match: usize,
@@ -220,7 +249,7 @@ impl Options {
     }
     ///
     /// The pattern to found
-    pub fn set_array_to_match(&mut self, to_match: &[u8]) {
+    pub fn split_by(&mut self, to_match: &[u8]) {
         //TODO: Change value of a Vector --> Optimizable?
         self.to_match.clear();
         self.to_match.extend(to_match);
@@ -228,13 +257,13 @@ impl Options {
     ///
     /// Set the initiale size of the pattern to match
     /// This sets the initiale size of the extending buffer needed to read over the reading buffer
-    pub fn set_initiale_sz_to_match(&mut self, sz: usize) -> &mut Self {
+    pub fn set_reserve_sz_to_match(&mut self, sz: usize) -> &mut Self {
         self.initiale_sz_to_match = sz;
         self
     }
     ///
     /// Set the size of each extension of the extending buffer needed to read over the reading buffer
-    pub fn set_chunk_sz(&mut self, sz: usize) -> &mut Self {
+    pub fn set_extend_buffer_additionnal_sz(&mut self, sz: usize) -> &mut Self {
         self.chunk_sz = sz;
         self
     }
@@ -269,9 +298,8 @@ mod tests {
 
             text.push_str(&str);
 
-            if reader.matched() || sz == 0 {
-                if reader.matched() == false {
-                    // We enter here because of `sz=0` condition, so it's the end of the buffer
+            if sz == 0 {
+                if reader.next_part().unwrap() == None {
                     break;
                 }
             }
@@ -294,11 +322,11 @@ mod tests {
         let mut reader = BufReadSplitter::new(
             &mut input_reader,
             Options::default()
-                .set_initiale_sz_to_match(2)
-                .set_chunk_sz(1)
+                .set_reserve_sz_to_match(2)
+                .set_extend_buffer_additionnal_sz(1)
                 .clone(),
         );
-        reader.set_array_to_match("<SEP>".as_bytes());
+        reader.stop_on("<SEP>".as_bytes());
         let mut i = 0;
         let mut buf = vec![0u8; buf_ext];
         let mut text = String::new();
@@ -308,35 +336,51 @@ mod tests {
 
             text.push_str(&str);
 
-            if reader.matched() || sz == 0 {
+            // At end of the buffer part ?
+            if sz == 0 {
                 i += 1;
 
                 match i {
-                    1 => assert_eq!(text, "First", "Case 1"),
-                    2 => assert_eq!(text, "", "Case 2"),
-                    3 => assert_eq!(text, "X", "Case 3"),
-                    4 => assert_eq!(text, "Second", "Case 4"),
-                    5 => assert_eq!(text, "Y", "Case 5"),
-                    6 => assert_eq!(text, "Small", "Case 6"),
-                    7 => assert_eq!(text, "0", "Case 7"),
-                    8 => assert_eq!(text, "Bigger", "Case 8"),
-                    9 => assert_eq!(text, "Till the end...", "Case 9"),
-                    10 => assert_eq!(text, "The last!", "Case 10"),
+                    1 => assert_eq!((text.as_str(), reader.matched()), ("First", true), "Case 1"),
+                    2 => assert_eq!((text.as_str(), reader.matched()), ("", true), "Case 2"),
+                    3 => assert_eq!((text.as_str(), reader.matched()), ("X", true), "Case 3"),
+                    4 => assert_eq!(
+                        (text.as_str(), reader.matched()),
+                        ("Second", true),
+                        "Case 4"
+                    ),
+                    5 => assert_eq!((text.as_str(), reader.matched()), ("Y", true), "Case 5"),
+                    6 => assert_eq!((text.as_str(), reader.matched()), ("Small", true), "Case 6"),
+                    7 => assert_eq!((text.as_str(), reader.matched()), ("0", true), "Case 7"),
+                    8 => assert_eq!(
+                        (text.as_str(), reader.matched()),
+                        ("Bigger", true),
+                        "Case 8"
+                    ),
+                    9 => assert_eq!(
+                        (text.as_str(), reader.matched()),
+                        ("Till the end...", true),
+                        "Case 9"
+                    ),
+                    10 => assert_eq!(
+                        (text.as_str(), reader.matched()),
+                        ("The last!", false),
+                        "Case 10"
+                    ),
                     _ => assert_eq!(false, true, "Overflow"),
                 }
                 text.clear();
 
-                if reader.matched() == false {
-                    // We enter here because of `sz=0` condition, so it's the end of the buffer
+                if reader.next_part().unwrap() == None {
                     break;
                 }
             }
 
             match i {
-                3 => reader.set_array_to_match("<SEP2>".as_bytes()),
-                5 => reader.set_array_to_match("<>".as_bytes()),
-                7 => reader.set_array_to_match("<SEPARATOR_03>".as_bytes()),
-                8 => reader.set_array_to_match("<end>".as_bytes()),
+                3 => reader.stop_on("<SEP2>".as_bytes()),
+                5 => reader.stop_on("<>".as_bytes()),
+                7 => reader.stop_on("<SEPARATOR_03>".as_bytes()),
+                8 => reader.stop_on("<end>".as_bytes()),
                 _ => {}
             }
         }
@@ -353,7 +397,7 @@ mod tests {
 
         let mut input_reader = input.as_bytes();
         let mut reader = BufReadSplitter::new(&mut input_reader, Options::default().clone());
-        reader.set_array_to_match("<SEP>".as_bytes());
+        reader.stop_on("<SEP>".as_bytes());
         let mut i = 0;
 
         let mut buf = vec![0u8; buf_sz];
@@ -364,27 +408,20 @@ mod tests {
 
             text.push_str(&str);
 
-            if reader.matched() || sz == 0 {
+            if sz == 0 {
                 i += 1;
 
                 match i {
-                    1 => {
-                        assert_eq!(text, "", "Case 1");
-                    }
-                    2 => {
-                        assert_eq!(text, "First", "Case 2");
-                    }
-                    3 => {
-                        assert_eq!(text, "", "Case 3");
-                    }
+                    1 => assert_eq!((text.as_str(), reader.matched()), ("", true), "Case 1"),
+                    2 => assert_eq!((text.as_str(), reader.matched()), ("First", true), "Case 2"),
+                    3 => assert_eq!((text.as_str(), reader.matched()), ("", false), "Case 3"),
                     _ => {
                         assert_eq!(false, true, "Overflow")
                     }
                 }
                 text.clear();
 
-                if reader.matched() == false {
-                    // We enter here because of `sz=0` condition, so it's the end of the buffer
+                if reader.next_part().unwrap() == None {
                     break;
                 }
             }
@@ -403,7 +440,7 @@ mod tests {
 
         let mut input_reader = input.as_bytes();
         let mut reader = BufReadSplitter::new(&mut input_reader, Options::default().clone());
-        reader.set_array_to_match("<SEP>".as_bytes());
+        reader.stop_on("<SEP>".as_bytes());
         let mut i = 0;
 
         let mut buf = vec![0u8; buf_sz];
@@ -414,22 +451,67 @@ mod tests {
 
             text.push_str(&str);
 
-            if reader.matched() || sz == 0 {
+            if sz == 0 {
                 i += 1;
 
                 match i {
-                    1 => assert_eq!(text, "", "Case 1"),
-                    2 => assert_eq!(text, "First<S", "Case 2"),
+                    1 => assert_eq!((text.as_str(), reader.matched()), ("", true), "Case 1"),
+                    2 => assert_eq!(
+                        (text.as_str(), reader.matched()),
+                        ("First<S", false),
+                        "Case 2"
+                    ),
                     _ => assert_eq!(false, true, "Overflow"),
                 }
                 text.clear();
 
-                if reader.matched() == false {
+                if reader.next_part().unwrap() == None {
                     // We enter here because of `sz=0` condition, so it's the end of the buffer
                     break;
                 }
             }
         }
         assert_eq!(i, 2, "Missing iterations for {buf_sz}")
+    }
+
+    #[test]
+    fn test_next_but_not_at_end() {
+        let input = "First<SEP>A longue test ending without <SEP".to_string();
+        //           123456789 123456789 123456789 123456789 123456789 123456789 123456789 123456789 123456789 123456789
+        //                    10        20        30        40        50        60        70        80        90
+        let mut input_reader = input.as_bytes();
+
+        let mut reader = BufReadSplitter::new(&mut input_reader, Options::default().clone());
+        reader.stop_on("<SEP>".as_bytes());
+
+        let mut i = 0;
+        loop {
+            i += 1;
+
+            let mut buf = vec![0u8; 3];
+
+            let sz = reader.read(&mut buf).unwrap();
+            let text = String::from_utf8_lossy(&buf[..sz]);
+
+            if i == 1 {
+                assert_eq!(text, "Fir", "Case 1a");
+                assert_eq!(reader.matched, false, "Case 1b");
+
+                let has_next = reader.next_part().unwrap();
+                assert_eq!(has_next, Some(()), "Case 1c");
+            } else if i == 2 {
+                assert_eq!(text, "A l", "Case 2a");
+                assert_eq!(reader.matched, false, "Case 2b");
+
+                let has_next = reader.next_part().unwrap();
+                assert_eq!(has_next, None, "Case 2c");
+
+                // A read after end simply return 0, no error
+                let last_sz_read = reader.read(&mut buf).unwrap();
+                assert_eq!(last_sz_read, 0, "Case 3");
+
+                break;
+            }
+        }
     }
 }

@@ -16,7 +16,7 @@
 //! // Set the separator
 //! reader.stop_on("<SEP>".as_bytes());
 //!
-//! // Declaring a buffer (indeed, a small one to test truncations)
+//! // Declaring a buffer (indeed, a small one to POC truncations)
 //! let mut buf = vec![0u8; 5];
 //!
 //! // The worker
@@ -43,5 +43,7 @@
 //! //   Third *end*
 //! //   The last one ! *end*
 //! ```
-
+//!
+//! To debug purpose, add dependencies "log"
+//!
 pub mod buf_read_splitter;

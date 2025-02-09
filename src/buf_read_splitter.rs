@@ -26,14 +26,14 @@ impl<'a> BufReadSplitter<'a> {
         }
     }
     ///
-    /// Return true if the buffer has stopped because it stop at the slice to match
+    /// Return true if the buffer has stopped because the slice to match reached
     pub fn matched(&self) -> bool {
         self.matched
     }
     ///
     /// Change the match pattern
     pub fn stop_on(&mut self, to_match: &[u8]) {
-        self.options.split_by(to_match);
+        self.options.stop_on(to_match);
     }
     ///
     /// Set a limit of bytes to read of a buffer part
@@ -50,9 +50,10 @@ impl<'a> BufReadSplitter<'a> {
         sz
     }
     ///
-    /// Read the buffer pushing in the buffer extender
-    /// Return the position where news datas from the "read" starts
+    /// Read the input buffer, pushing in the buffer extender
+    /// Return the position where news datas from the "read" starting
     fn read_in_buf_extend_at_end(&mut self) -> std::io::Result<(usize, usize)> {
+        // Extends if needed
         if self.buf_extend.capacity() < self.buf_extend.len() + self.options.chunk_sz {
             self.buf_extend.reserve(self.options.chunk_sz);
         }
@@ -83,26 +84,25 @@ impl<'a> BufReadSplitter<'a> {
                 );
             }
         }
-        if pos == self.options.to_match.len()
-            || *el_buf != unsafe { *self.options.to_match.get_unchecked(pos) }
+        if pos == self.options.to_match.len() || *el_buf != *self.options.to_match.get(pos).unwrap()
         {
             MatchResult::Mismatch
+        } else if self.options.to_match.len() == pos + 1 {
+            MatchResult::Match
         } else {
-            if self.options.to_match.len() == pos + 1 {
-                MatchResult::Match
-            } else {
-                MatchResult::NeedNext
-            }
+            MatchResult::NeedNext
         }
     }
     ///
     /// next buffer part
     pub fn next_part(&mut self) -> Result<Option<()>> {
         // We choose to return a Result<Option<()>> to be  representative of this logic :
-        //   - call a function --> You have to manage an possible error
-        //   - ok there's no error --> So is there a next thing
-
+        //   - call a function --> You have to manage a possible error
+        //   - ok there's no error --> So is there something next
         if self.matched == false {
+            #[cfg(feature = "log")]
+            log::debug!("====next_part skip this :");
+
             // Have to read until end of buffer or separator
             let mut buf = [0u8; 100];
             while {
@@ -113,6 +113,12 @@ impl<'a> BufReadSplitter<'a> {
                 // while condition :
                 self.matched == false && sz_read != 0
             } {}
+
+            #[cfg(feature = "log")]
+            log::debug!("====next_part skip end====");
+        } else {
+            #[cfg(feature = "log")]
+            log::debug!("next_part --> Nothing to skip");
         }
 
         if self.matched == false {
@@ -123,8 +129,11 @@ impl<'a> BufReadSplitter<'a> {
             Ok(Some(())) // It have been stopping because it reached the separator
         }
     }
+    ///
+    /// Common read buffer function
     fn internal_read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
         let mut sz_output = 0;
+
         if self.buf_extend.len() > 0 {
             sz_output = Self::pop_buf_extend(&mut self.buf_extend, buf)
         }
@@ -151,12 +160,22 @@ impl<'a> BufReadSplitter<'a> {
                     // The buffer ending exactly before the matched part
                     // (sz_output is a size, so we have to add 1)
                     sz_output = i + 1 - sz_found;
+
+                    // Debug
+                    #[cfg(feature = "log")]
+                    Self::log_read(
+                        &buf[0..sz_output],
+                        &buf[sz_output..sz_output + sz_found],
+                        &self.buf_extend,
+                    );
+
+                    // Matched
                     self.matched = true;
                     return Ok(sz_output);
                 }
             }
         }
-        // In fact it's : sz_found>0 AND NeedNext, but we can bypass NeedNext test because Match raise a `return`
+        // In fact it's : sz_found>0 AND NeedNext, but we can bypass NeedNext test because the previous Match raise a `return`
         if sz_found > 0 {
             'loop_extend_buffer: loop {
                 let search_from = {
@@ -183,7 +202,7 @@ impl<'a> BufReadSplitter<'a> {
                         MatchResult::Match => {
                             sz_found += 1;
 
-                            // The size to return had to exclude the matched part
+                            // The size to return has to exclude the matched part
                             // So it's, in a point of view [buffer]+[buffer extend[last read]] :
                             //    buf.len() <-- Start position of <buffer extend>
                             //    search_from <-- Start position of <last read>
@@ -195,6 +214,10 @@ impl<'a> BufReadSplitter<'a> {
                             // Remove the matched part because we have to use the remain part so it will feed the next <read>
                             self.buf_extend.drain(..search_from + i + 1);
 
+                            // Debug
+                            #[cfg(feature = "log")]
+                            Self::log_read(&buf[0..sz_output], &buf[sz_output..], &self.buf_extend);
+
                             // Matched
                             self.matched = true;
                             return Ok(sz_output);
@@ -204,7 +227,32 @@ impl<'a> BufReadSplitter<'a> {
             }
         }
         // No match
+        #[cfg(feature = "log")]
+        Self::log_read(
+            &buf[0..sz_output],
+            &buf[sz_output..sz_output],
+            &self.buf_extend,
+        );
         Ok(sz_output)
+    }
+    ///
+    /// Log read
+    #[cfg(feature = "log")]
+    fn log_read(out_buf: &[u8], matched: &[u8], ext_buf: &[u8]) {
+        use format_hex::format_hex::FormatHex;
+        use log::debug;
+        let (l1, l2, l3) = FormatHex::new()
+            .push_comment("[")
+            .push_hex(out_buf)
+            .push_comment("]")
+            .push_hex(matched)
+            .push_comment("[")
+            .push_hex(ext_buf)
+            .push_comment("]")
+            .output();
+        debug!("{l1}");
+        debug!("{l2}");
+        debug!("{l3}");
     }
 }
 ///
@@ -275,10 +323,13 @@ impl Options {
     }
     ///
     /// The pattern to found
-    pub fn split_by(&mut self, to_match: &[u8]) {
+    pub fn stop_on(&mut self, to_match: &[u8]) {
         //TODO: Change value of a Vector --> Optimizable?
         self.to_match.clear();
         self.to_match.extend(to_match);
+
+        #[cfg(feature = "log")]
+        self.log_stop_on();
     }
     ///
     /// Set the initiale size of the pattern to match
@@ -298,6 +349,20 @@ impl Options {
     pub fn set_limit_read(&mut self, opt_sz: Option<usize>) -> &mut Self {
         self.limit_read = opt_sz;
         self
+    }
+    ///
+    /// Log an array
+    #[cfg(feature = "log")]
+    fn log_stop_on(&self) {
+        use format_hex::format_hex::FormatHex;
+        use log::debug;
+        let (l1, l2, l3) = FormatHex::new()
+            .push_comment("stop_on=")
+            .push_hex(self.to_match.as_slice())
+            .output();
+        debug!("{l1}");
+        debug!("{l2}");
+        debug!("{l3}");
     }
 }
 ///

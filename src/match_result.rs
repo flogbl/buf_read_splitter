@@ -9,5 +9,5 @@ pub enum MatchResult {
     NeedNext,
     ///
     /// Matched
-    Match,
+    Match(usize, usize),
 }

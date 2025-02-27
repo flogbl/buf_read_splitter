@@ -1,4 +1,5 @@
 use core::fmt;
+use std::fmt::Error;
 use std::{cmp, io::Read};
 
 use crate::buf_ext::BufExt;
@@ -17,6 +18,7 @@ pub struct BufReadSplitter<'a, T: Matcher> {
     options: Options,       // Options stores here
     matched: bool,          // Indicate that the pattern is matched
     curr_limit_read: Option<usize>, // Counter of the limit to read
+    remain: usize,
     #[cfg(feature = "log")]
     log_call_read: usize,
     #[cfg(feature = "log")]
@@ -36,6 +38,7 @@ impl<'a, T: Matcher> BufReadSplitter<'a, T> {
             options,
             matched: false,
             curr_limit_read: max_read,
+            remain: 0,
             #[cfg(feature = "log")]
             log_call_read: 0,
             #[cfg(feature = "log")]
@@ -68,6 +71,9 @@ impl<'a, T: Matcher> BufReadSplitter<'a, T> {
         if self.matched == false {
             Ok(None) // At the end of the input buffer
         } else {
+            #[cfg(feature = "log")]
+            log::debug!("Set matched to FALSE");
+
             self.matched = false; // We are now on the next buffer, nothing even read, nothing even matched
             self.curr_limit_read = self.options.limit_read;
             Ok(Some(())) // It had just been stopping because it reached the separator
@@ -93,7 +99,7 @@ impl<'a, T: Matcher> BufReadSplitter<'a, T> {
             // At the end if :
             //   - matched and there's nothing more to take in the extend buffer
             //   - or end of file
-            self.matched == false && sz_read != 0
+            (self.matched == false || self.remain > 0) && sz_read != 0
         } {}
         #[cfg(feature = "log")]
         log::debug!("====next_part skip end====");
@@ -106,54 +112,104 @@ impl<'a, T: Matcher> BufReadSplitter<'a, T> {
         {
             self.log_call_read += 1;
         }
-        // Initialize the size to return
-        let mut sz_read = 0;
 
-        // First, feed the output buffer consuming datas of the previous read
-        if self.buf_extend.len() > 0 {
-            sz_read = self.buf_extend.pop_buf_into(buf);
-        }
-        // Feed the remaining part by consumming the input buffer
-        if sz_read < buf.len() {
-            sz_read += self.buf_extend.read_direct(&mut buf[sz_read..])?;
-        }
-
-        match self.search_match(buf, sz_read)? {
-            Some((sz_matched, pos)) => {
-                // Save the part next to the matched part if there's one
-                if pos + 1 < buf.len() {
-                    self.buf_extend.push_at_begin(&buf[pos + 1..sz_read]);
-                }
-
-                // If a part of the buf_extend must not be returned, we remove it
-                if pos >= buf.len() {
-                    self.buf_extend.pop_buf(pos - buf.len() + 1);
-                }
+        if self.matched {
+            // Here to manage the remain part to return in the actual buffer
+            if self.remain == 0 {
+                #[cfg(feature = "log")]
+                log::debug!("Matched but no remain");
+                Ok(0)
+            } else {
+                let sz_max = cmp::min(self.remain, buf.len());
+                let sz = self.buf_extend.pop_buf_into(&mut buf[0..sz_max]);
+                self.remain -= sz;
 
                 // Debug
                 #[cfg(feature = "log")]
                 Self::log_read(
-                    "Match ",
-                    &buf[0..sz_read],
-                    &buf[sz_read..cmp::min(sz_read + sz_matched, buf.len())],
+                    "Remain ",
+                    &buf[0..sz],
+                    &buf[0..0],
                     &self.buf_extend.cloned_internal_vec(),
                     "",
                 );
 
-                // The buffer ending exactly before the matched part (this position can only start inside the output buffer)
-                self.matched = true;
-                return Ok(pos + 1 - sz_matched);
+                Ok(sz)
             }
-            None => {
-                #[cfg(feature = "log")]
-                Self::log_read(
-                    "no match-",
-                    &buf[0..sz_read],
-                    &buf[sz_read..sz_read],
-                    &self.buf_extend.cloned_internal_vec(),
-                    "",
-                );
-                Ok(sz_read)
+        } else {
+            // Initialize the size to return
+            let mut sz_read = 0;
+
+            // First, feed the output buffer consuming datas of the previous read
+            if self.buf_extend.len() > 0 {
+                sz_read = self.buf_extend.pop_buf_into(buf);
+            }
+            // Feed the remaining part by consumming the input buffer
+            if sz_read < buf.len() {
+                sz_read += self.buf_extend.read_direct(&mut buf[sz_read..])?;
+            }
+
+            match self.search_match(buf, sz_read)? {
+                Some((sz_matched, pos)) => {
+                    // Calculate absolute position (in buf+buf_ext) and relative positions (in buf_ext)
+                    let abs_end = pos + 1;
+                    let abs_start = abs_end - sz_matched;
+                    let rel_end = {
+                        if abs_end > buf.len() {
+                            abs_end - buf.len()
+                        } else {
+                            0
+                        }
+                    };
+                    let rel_start = {
+                        if rel_end > sz_matched {
+                            rel_end - sz_matched
+                        } else {
+                            0
+                        }
+                    };
+
+                    // Save the part next to the matched part if there's one
+                    if abs_end < buf.len() {
+                        self.buf_extend.push_at_begin(&buf[abs_end..sz_read]);
+                    }
+
+                    // If a part of the buf_extend must not be returned, we remove it
+                    if rel_end > 0 {
+                        self.buf_extend.drain(rel_start..rel_end); //.pop_buf(pos - buf.len() + 1);
+                    }
+
+                    // If there's something next to return in the extend buf
+                    if abs_start > buf.len() {
+                        self.remain = rel_start;
+                    }
+
+                    let sz_to_return = cmp::min(buf.len(), abs_start);
+
+                    // Debug
+                    #[cfg(feature = "log")]
+                    Self::log_read(
+                        "Match ",
+                        &buf[0..sz_to_return],
+                        &buf[sz_to_return..buf.len()],
+                        &self.buf_extend.cloned_internal_vec(),
+                        &format!("sz_to_return={sz_to_return} bs_start={abs_start} abs_end={abs_end} rel_start={rel_start} rel_end={rel_end} self.remain={remain}",remain=self.remain),
+                    );
+
+                    self.matched = true;
+                    Ok(sz_to_return)
+                }
+                None => {
+                    #[cfg(feature = "log")]
+                    Self::log_read(
+                        "no match-",
+                        &buf[0..sz_read],
+                        &buf[sz_read..sz_read],
+                        &self.buf_extend.cloned_internal_vec(),
+                        "",
+                    );
+                    Ok(sz_read)
+                }
             }
         }
     }
@@ -164,35 +220,55 @@ impl<'a, T: Matcher> BufReadSplitter<'a, T> {
         buf: &mut [u8],
         sz_read: usize,
     ) -> std::io::Result<Option<(usize, usize)>> {
-        let mut sz_matched = 0;
-        let mut pos = 0usize;
+        let mut sz_matched = 0; //Size matched
+        let mut pos = 0usize; //Absolute position of the last position that matched
 
+        // For factorisation of the two loops
+        let fn_calc_returned = |take_left: usize,
+                                take_right: usize,
+                                sz_matched: usize,
+                                pos: usize| {
+            if take_left + take_right > sz_matched {
+                panic!("Size matched overflow ! take_left={take_left} + take_right={take_left} > sz_matched={sz_matched}")
+            }
+            let sz_returned = sz_matched - take_left - take_right;
+            let pos_returned = pos - take_right;
+            (sz_returned, pos_returned)
+        };
+
+        // Search in buf
         for el in buf[..sz_read].into_iter() {
             match self.matcher.sequel(*el, sz_matched) {
                 MatchResult::NeedNext => sz_matched += 1,
-                MatchResult::Mismatch => sz_matched = 0,
-                MatchResult::Match => {
+                MatchResult::Match(take_left, take_right) => {
                     sz_matched += 1;
-                    return Ok(Some((sz_matched, pos)));
+                    let res = fn_calc_returned(take_left, take_right, sz_matched, pos);
+                    return Ok(Some(res));
                 }
+                MatchResult::Mismatch => sz_matched = 0,
             }
             pos += 1;
         }
+
+        // Continue to search in buf_ext if needed
         if sz_matched > 0 {
             let it = self.buf_extend.iter_grow();
             for res in it {
                 let el = res?;
                 match self.matcher.sequel(el, sz_matched) {
                     MatchResult::NeedNext => sz_matched += 1,
-                    MatchResult::Match => {
+                    MatchResult::Match(take_left, take_right) => {
                         sz_matched += 1;
-                        return Ok(Some((sz_matched, pos)));
+                        let res = fn_calc_returned(take_left, take_right, sz_matched, pos);
+                        return Ok(Some(res));
                     }
                     MatchResult::Mismatch => break,
                 }
                 pos += 1;
             }
         }
+
+        // None found
         Ok(None)
     }
     ///
@@ -203,11 +279,11 @@ impl<'a, T: Matcher> BufReadSplitter<'a, T> {
         use log::debug;
         let (l1, l2, l3) = FormatHex::new()
             .push_comment(comment)
-            .push_comment("[")
+            .push_comment("in[")
             .push_hex(out_buf)
-            .push_comment("]")
+            .push_comment("] ign[")
             .push_hex(matched)
-            .push_comment("[")
+            .push_comment("] ext[")
             .push_hex(ext_buf)
             .push_comment("] ")
             .push_comment(comment_end)
@@ -223,12 +299,18 @@ impl<'a, T: Matcher> Read for BufReadSplitter<'a, T> {
     ///
     /// Read until the begin of a match or end of the buffer
     fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
-        if self.matched == true {
+        if self.matched == true && self.remain == 0 {
+            #[cfg(feature = "log")]
+            log::debug!("Must call next first !");
+
             return Ok(0); // Must call next first !
         }
         if let Some(sz) = self.curr_limit_read {
             let max = cmp::min(sz, buf.len());
             if max == 0 {
+                #[cfg(feature = "log")]
+                log::debug!("curr_limit_read reached !");
+
                 Ok(0)
             } else {
                 let buf_slice = &mut buf[..max];

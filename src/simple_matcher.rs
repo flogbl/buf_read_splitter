@@ -26,7 +26,7 @@ impl Matcher for SimpleMatcher {
         if pos == self.to_match.len() || el_buf != *self.to_match.get(pos).unwrap() {
             MatchResult::Mismatch
         } else if self.to_match.len() == pos + 1 {
-            MatchResult::Match
+            MatchResult::Match(0, 0)
         } else {
             MatchResult::NeedNext
         }

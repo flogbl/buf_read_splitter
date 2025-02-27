@@ -1,5 +1,5 @@
 use core::fmt;
-use std::cmp;
+use std::{cmp, ops::Range};
 
 use crate::buf_ext_iter::BufExtIter;
 
@@ -53,8 +53,8 @@ impl<'a> BufExt<'a> {
     }
     ///
     /// Remove a certain number of elements at the begin of the extend buffer
-    pub fn pop_buf(&mut self, nbr: usize) {
-        self.ext.drain(..nbr);
+    pub fn drain(&mut self, range: Range<usize>) {
+        self.ext.drain(range);
     }
     ///
     /// Read the input buffer

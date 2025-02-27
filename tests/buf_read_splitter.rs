@@ -242,7 +242,6 @@ mod tests {
             Options::default(),
         );
 
-        // Must take the separator into account, even if the limit fall in the middle of it
         {
             let mut buf = [0u8; 3];
             reader.set_limit_read(Some(7));
@@ -361,9 +360,122 @@ mod tests {
             if el_buf == b'\r' {
                 MatchResult::NeedNext
             } else if el_buf == b'\n' {
-                MatchResult::Match
+                MatchResult::Match(0, 0)
             } else {
                 MatchResult::Mismatch
+            }
+        }
+    }
+
+    #[test]
+    fn test_take() {
+        for left in 0..5 {
+            for right in 0..(5 - left) {
+                for sz in 1..50 {
+                    #[cfg(feature = "log")]
+                    log::debug!("sz={sz} lef={left} right={right}");
+
+                    subtest_take(sz, left, right);
+                }
+            }
+        }
+    }
+    fn subtest_take(sz_buf: usize, take_left: usize, take_right: usize) {
+        let input = "First<SEP>Second<SEP>Third<SEP>Fourth<SEP>Fifth".to_string();
+        let mut input_reader = input.as_bytes();
+
+        let sep = "<SEP>";
+        let left_sep = &sep[0..take_left];
+        let right_sep = &sep[sep.len() - take_right..];
+
+        let matcher = IncludeMatcher::new(sep, take_left, take_right);
+        let mut reader = BufReadSplitter::new(&mut input_reader, matcher, Options::default());
+
+        let mut buf = vec![0u8; sz_buf];
+        let mut words = Vec::new();
+        let mut word = String::new();
+
+        while {
+            match reader.read(&mut buf) {
+                Ok(sz) => {
+                    #[cfg(feature = "log")]
+                    log::debug!("sz={sz}");
+
+                    if sz == 0 {
+                        words.push(word.clone());
+                        word.clear();
+                        match reader.next_part() {
+                            Ok(Some(())) => true,
+                            Ok(None) => false,
+                            Err(err) => panic!("Error in next_part() : {err}"),
+                        }
+                    } else {
+                        let to_str = String::from_utf8_lossy(&buf[..sz]);
+                        word.push_str(&to_str);
+
+                        #[cfg(feature = "log")]
+                        log::debug!("word={word}");
+                        true
+                    }
+                }
+                Err(err) => panic!("Error while reading : {err}"),
+            }
+        } {}
+        assert_eq!(
+            words.len(),
+            5,
+            "Case 1a --> sz_buf:{sz_buf}, take_left:{take_left}, take_right:{take_right}"
+        );
+        assert_eq!(
+            &words[0],
+            &format!("First{left_sep}"),
+            "Case 2a --> sz_buf:{sz_buf}, take_left:{take_left}, take_right:{take_right}"
+        );
+        assert_eq!(
+            &words[1],
+            &format!("{right_sep}Second{left_sep}"),
+            "Case 2b --> sz_buf:{sz_buf}, take_left:{take_left}, take_right:{take_right}"
+        );
+        assert_eq!(
+            &words[2],
+            &format!("{right_sep}Third{left_sep}"),
+            "Case 2c --> sz_buf:{sz_buf}, take_left:{take_left}, take_right:{take_right}"
+        );
+        assert_eq!(
+            &words[3],
+            &format!("{right_sep}Fourth{left_sep}"),
+            "Case 2d --> sz_buf:{sz_buf}, take_left:{take_left}, take_right:{take_right}"
+        );
+        assert_eq!(
+            &words[4],
+            &format!("{right_sep}Fifth"),
+            "Case 2e --> sz_buf:{sz_buf}, take_left:{take_left}, take_right:{take_right}"
+        );
+    }
+    struct IncludeMatcher {
+        sep: Vec<u8>,
+        take_left: usize,
+        take_right: usize,
+    }
+    impl IncludeMatcher {
+        pub fn new(str_sep: &str, take_left: usize, take_right: usize) -> Self {
+            Self {
+                sep: Vec::from(str_sep.as_bytes()),
+                take_left,
+                take_right,
+            }
+        }
+    }
+    impl Matcher for IncludeMatcher {
+        fn sequel(&mut self, el_buf: u8, pos: usize) -> MatchResult {
+            if pos >= self.sep.len() || self.sep[pos] != el_buf {
+                MatchResult::Mismatch
+            } else {
+                if self.sep.len() == pos + 1 {
+                    MatchResult::Match(self.take_left, self.take_right)
+                } else {
+                    MatchResult::NeedNext
+                }
             }
         }
     }

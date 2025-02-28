@@ -1,5 +1,4 @@
 use core::fmt;
-use std::fmt::Error;
 use std::{cmp, io::Read};
 
 use crate::buf_ext::BufExt;

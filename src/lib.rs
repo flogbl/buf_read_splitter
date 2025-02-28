@@ -132,10 +132,13 @@
 //!
 //!For more information :\
 //!- [https://docs.rs/buf_read_splitter/latest/buf_read_splitter/]\
-//!- [https://crates.io/crates/buf_read_splitter]\
+//!- [https://crates.io/crates/buf_read_splitter]
 //!
 //!A suggestion or bug alert ? Feel free to fill an issue :\
-//!- [https://github.com/flogbl/buf_read_splitter/issues]\
+//!- [https://github.com/flogbl/buf_read_splitter/issues]
+//!
+//!You can also contact me :
+//!- [https://github.com/flogbl]
 //!
 //!Thanks for your interest!
 //!

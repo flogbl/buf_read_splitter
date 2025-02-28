@@ -1,4 +1,4 @@
-//!**buf_read_splitter** eases the way to read a buffer that have to stop at each separator.
+//!**buf_read_splitter** eases the way to read a buffer that has to stop on a defined pattern (like an array of [u8])
 //!
 //!This could be a simple separator :
 //!```rust
@@ -60,8 +60,7 @@
 //!assert_eq!(&words[4], "Fifth");
 //!```
 //!
-//!The separating pattern is customizable, for more complex cases. It's done by implementing the trait `Matcher`.
-//!
+//!This can be also a more complex pattern. It's done by implementing the trait `Matcher`.\
 //!For example a Matcher able to split a stream at each Mac, Unix or Windows end of line :
 //!```rust
 //!use buf_read_splitter::{
@@ -122,11 +121,14 @@
 //!...and to reinitialize it :\
 //!`reader.set_limit_read(None);`\
 //!
+//!
 //!A call to `.next_part()` pass to the next part, however the end was reached or not, so it skips what has not been readed.
+//!
 //!
 //!For debug purpose, you can activate the "log" features in the Cargo.toml :\
 //!`[dependencies]`\
 //!`buf_read_splitter = { path = "../buf_read_splitter_v0.3/buf_read_splitter", features = ["log",] }`
+//!
 //!
 //!For more information :\
 //!- [https://docs.rs/buf_read_splitter/latest/buf_read_splitter/]\

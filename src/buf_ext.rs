@@ -4,9 +4,10 @@ use std::{cmp, ops::Range};
 use crate::buf_ext_iter::BufExtIter;
 
 pub struct BufExt<'a> {
-    reader: &'a mut dyn std::io::Read,
-    ext: Vec<u8>,
-    sz_read_ext: usize,
+    reader: &'a mut dyn std::io::Read, // The stream to read
+    ext: Vec<u8>,                      // Bytes in memory
+    sz_read_ext: usize,                // Size of the grow for each read
+    eos_reached: bool,                 // Indicate that End of stream was reached
 }
 impl<'a> BufExt<'a> {
     ///
@@ -20,6 +21,7 @@ impl<'a> BufExt<'a> {
             reader,
             ext: Vec::with_capacity(initiale_capacity),
             sz_read_ext,
+            eos_reached: false,
         }
     }
     ///
@@ -38,6 +40,10 @@ impl<'a> BufExt<'a> {
         if start + sz_read < self.ext.len() {
             // Not all the buffer has been filling, so resize
             self.ext.resize(start + sz_read, 0);
+        }
+
+        if sz_read == 0 {
+            self.eos_reached = true;
         }
 
         // Return the position of the readed part
@@ -77,10 +83,16 @@ impl<'a> BufExt<'a> {
         self.ext[pos]
     }
     ///
+    /// Indicate if End Of Stream is reached or not
+    pub fn eos_reached(&self) -> bool {
+        self.eos_reached
+    }
+    ///
     /// To iterate
-    pub fn iter_grow<'b>(&'b mut self) -> BufExtIter<'b, 'a> {
+    pub fn iter_growing<'b>(&'b mut self) -> BufExtIter<'b, 'a> {
         BufExtIter::new(self)
     }
+    #[allow(dead_code)]
     pub fn cloned_internal_vec(&self) -> Vec<u8> {
         self.ext.clone()
     }

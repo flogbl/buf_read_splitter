@@ -479,4 +479,100 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn test_end_of_stream() {
+        let lst_inputs = vec![
+            "First\rSecond\nTh1rd\r\nFourth\n\rFifth".to_string(),
+            "\rFirst\rSecond\nTh2rd\r\nFourth\n\rFifth".to_string(),
+            "\r\nFirst\rSecond\nTh3rd\r\nFourth\n\rFifth".to_string(),
+            "First\rSecond\nTh4rd\r\nFourth\n\rFifth\r".to_string(),
+            "First\rSecond\nTh5rd\r\nFourth\n\rFifth\r\n".to_string(),
+        ];
+        let lst_outputs = vec![
+            "First.Second.Th1rd.Fourth..Fifth.".to_string(),
+            ".First.Second.Th2rd.Fourth..Fifth.".to_string(),
+            ".First.Second.Th3rd.Fourth..Fifth.".to_string(),
+            "First.Second.Th4rd.Fourth..Fifth..".to_string(),
+            "First.Second.Th5rd.Fourth..Fifth..".to_string(),
+        ];
+
+        for (i, o) in std::iter::zip(lst_inputs, lst_outputs) {
+            for sz in 1..50 {
+                subtest_end_of_stream(sz, &i, &o);
+            }
+        }
+    }
+    fn subtest_end_of_stream(sz_buf: usize, i: &str, o: &str) {
+        let mut input_reader = i.as_bytes();
+
+        let mut reader = BufReadSplitter::new(
+            &mut input_reader,
+            AllEndOfLineMatcher::new(),
+            Options::default(),
+        );
+
+        let mut buf = vec![0u8; sz_buf];
+        let mut text = String::new();
+
+        while {
+            match reader.read(&mut buf) {
+                Ok(sz) => {
+                    #[cfg(feature = "log")]
+                    log::debug!("sz={sz}");
+
+                    if sz == 0 {
+                        text.push('.');
+                        match reader.next_part() {
+                            Ok(Some(())) => true,
+                            Ok(None) => false,
+                            Err(err) => panic!("Error in next_part() : {err}"),
+                        }
+                    } else {
+                        let to_str = String::from_utf8_lossy(&buf[..sz]);
+                        text.push_str(&to_str);
+                        true
+                    }
+                }
+                Err(err) => panic!("Error while reading : {err}"),
+            }
+        } {}
+        assert_eq!(&text, o, "Case :  sz_buf:{sz_buf}");
+    }
+    struct AllEndOfLineMatcher {
+        prev_char: u8,
+    }
+    impl AllEndOfLineMatcher {
+        pub fn new() -> Self {
+            Self { prev_char: 0 }
+        }
+    }
+    impl Matcher for AllEndOfLineMatcher {
+        /// Words can be \r, \n or \r\n
+        fn sequel(&mut self, el_buf: u8, pos: usize) -> MatchResult {
+            if pos == 0 {
+                if el_buf == b'\r' || el_buf == b'\n' {
+                    self.prev_char = el_buf;
+                    MatchResult::NeedNext
+                } else {
+                    MatchResult::Mismatch
+                }
+            } else if pos == 1 {
+                if el_buf == b'\n' && self.prev_char == b'\r' {
+                    MatchResult::Match(0, 0) //We are on \r\n
+                } else {
+                    MatchResult::Match(0, 1) //We have to ignore the last byte since it's not a part of the end of line pattern
+                }
+            } else {
+                panic!("We can't reach this code since we just manage 2 positions")
+            }
+        }
+        fn sequel_eos(&mut self, pos: usize) -> MatchResult {
+            if pos == 0 {
+                MatchResult::Match(0, 0) //Here the last char is \r or \n, at position 0
+            } else {
+                panic!("We can't reach this code since we just manage 2 positions")
+            }
+        }
+    }
 }

@@ -223,7 +223,7 @@ impl<'a, T: Matcher> BufReadSplitter<'a, T> {
         let mut sz_matched = 0; //Size matched
         let mut pos = 0usize; //Absolute position of the last position that matched
 
-        // For factorisation of the two loops
+        // For factorisation of the common part in the two loops
         let fn_calc_returned = |take_left: usize,
                                 take_right: usize,
                                 sz_matched: usize,
@@ -250,26 +250,40 @@ impl<'a, T: Matcher> BufReadSplitter<'a, T> {
             pos += 1;
         }
 
+        if sz_matched == 0 {
+            Ok(None)
+        } else
         // Continue to search in buf_ext if needed
-        if sz_matched > 0 {
-            let it = self.buf_extend.iter_grow();
+        {
+            let it = self.buf_extend.iter_growing();
             for res in it {
                 let el = res?;
                 match self.matcher.sequel(el, sz_matched) {
-                    MatchResult::NeedNext => sz_matched += 1,
+                    MatchResult::NeedNext => {
+                        sz_matched += 1;
+                    }
                     MatchResult::Match(take_left, take_right) => {
                         sz_matched += 1;
                         let res = fn_calc_returned(take_left, take_right, sz_matched, pos);
                         return Ok(Some(res));
                     }
-                    MatchResult::Mismatch => break,
+                    MatchResult::Mismatch => return Ok(None),
                 }
                 pos += 1;
             }
+            // We arrived here because in NeedNext state, so we have to manage the EOS call
+            if false == self.buf_extend.eos_reached() {
+                Ok(None)
+            } else {
+                match self.matcher.sequel_eos(sz_matched - 1) {
+                    MatchResult::Match(take_left, take_right) => {
+                        let res = fn_calc_returned(take_left, take_right, sz_matched, pos - 1);
+                        Ok(Some(res))
+                    }
+                    _ => Ok(None),
+                }
+            }
         }
-
-        // None found
-        Ok(None)
     }
     ///
     /// Log read

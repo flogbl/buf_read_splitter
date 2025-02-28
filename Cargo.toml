@@ -2,8 +2,17 @@
 name = "buf_read_splitter"
 version = "3.0.0"
 edition = "2021"
-description = "Buffer reader with the capacity to split(stop) on a giving [u8] separator"
+description = "Buffer reader that has the capacity to split(stop) on a giving [u8] separator"
 repository = "https://github.com/flogbl/buf_read_splitter"
 license = "MIT"
 exclude = [".gitignore"]
+
 [dependencies]
+env_logger = { version = "0.7", optional = true }
+log = { version = "0.4", optional = true }
+format_hex = { version = "0.1", optional = true }
+
+[features]
+default = []
+#default = ["log"]
+log = ["dep:log", "dep:format_hex", "dep:env_logger"]

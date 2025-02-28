@@ -1,47 +1,153 @@
-//! BufReadSplitter is a buffer reader that as the hability to stopping before each separator encounter.
-//! This separator is able to be updated on the fly.
+//!**buf_read_splitter** eases the way to read a buffer that has to stop on a defined pattern (like an array of [u8])
 //!
-//! Example :
-//! ```
-//! use buf_read_splitter::buf_read_splitter::{BufReadSplitter,Options};
-//! use std::io::Read;
+//!This could be a simple separator :
+//!```rust
+//!use std::io::Read;
+//!use buf_read_splitter::{
+//!        buf_read_splitter::BufReadSplitter,
+//!        match_result::MatchResult,
+//!        options::Options,
+//!        simple_matcher::SimpleMatcher,
+//!        };
 //!
-//! // We simulate a buffer from a String for illustration
-//! let input = "First<SEP>Second<SEP>Third<SEP>The last one !".to_string();
-//! let mut input_reader = input.as_bytes();
+//!// We simulate a stream with this content :
+//!let input = "First<SEP>Second<SEP>Third<SEP>Fourth<SEP>Fifth".to_string();
+//!let mut input_reader = input.as_bytes();
 //!
-//! // Create a splitter on this buffer
-//! let mut reader = BufReadSplitter::new(&mut input_reader, Options::default().clone());
+//!// We create a reader that will end at each "<SEP>" :
+//!let mut reader = BufReadSplitter::new(
+//!            &mut input_reader,
+//!            SimpleMatcher::new(b"<SEP>"),
+//!            Options::default(),
+//!);
 //!
-//! // Set the separator
-//! reader.stop_on("<SEP>".as_bytes());
+//!// List of separate String will be listed in a Vector :
+//!let mut words = Vec::new();
 //!
-//! // Declaring a buffer (indeed, a small one to test truncations)
-//! let mut buf = vec![0u8; 5];
+//!// Working variables :
+//!let mut word = String::new();
+//!let mut buf = vec![0u8; 100];
 //!
-//! // The worker
-//! let mut text = String::new();
+//!while {
+//!  // Read in buffer like any other buffer :
+//!  match reader.read(&mut buf) {
+//!    Err(err) => panic!("Error while reading : {err}"),
+//!    Ok(sz) => {
+//!      if sz > 0 {
+//!        // === Treat the buffer ===
+//!        let to_str = String::from_utf8_lossy(&buf[..sz]);
+//!        word.push_str(&to_str);
+//!        true
+//!      } else {
+//!        // === End of buffer part ===
+//!        words.push(word.clone());
+//!        word.clear();
+//!        match reader.next_part() {  //Try to pass to the next part of the buffer
+//!          Ok(Some(())) => true,     //There's a next part!
+//!          Ok(None) => false,        //There's no next part, so go out of the loop
+//!          Err(err) => panic!("Error in next_part() : {err}"),
+//!        }
+//!      }
+//!    }
+//!  }
+//!} {}
 //!
-//! while {
-//!     // Read a chunk of the input buffer
-//!     let sz = reader.read(&mut buf).unwrap();
-//!     // ... append the worker
-//!     text.push_str(&String::from_utf8_lossy(&buf[..sz]));
-//!     // At the end of the current buffer ?
-//!     if sz == 0 {
-//!         // Do something with the part
-//!         println!("{text} *end*");
-//!     }
+//!assert_eq!(words.len(), 5);
+//!assert_eq!(&words[0], "First");
+//!assert_eq!(&words[1], "Second");
+//!assert_eq!(&words[2], "Third");
+//!assert_eq!(&words[3], "Fourth");
+//!assert_eq!(&words[4], "Fifth");
+//!```
 //!
-//!     // Go to next part if there's one and if there's no error
-//!     sz == 0 && reader.next_part().unwrap() == Some(())
-//! } {}
+//!This can be also a more complex pattern. It's done by implementing the trait `Matcher`.\
+//!For example a Matcher able to split a stream at each Mac, Unix or Windows end of line :
+//!```rust
+//!use buf_read_splitter::{
+//!        match_result::MatchResult,
+//!        matcher::Matcher,
+//!        };
 //!
-//! // Output :
-//! //   First *end*
-//! //   Second *end*
-//! //   Third *end*
-//! //   The last one ! *end*
-//! ```
-
+//!struct AllEndOfLineMatcher {
+//!    prev_char: u8,
+//!}
+//!impl AllEndOfLineMatcher {
+//!    pub fn new() -> Self {
+//!        Self { prev_char: 0 }
+//!    }
+//!}
+//!impl Matcher for AllEndOfLineMatcher {
+//!    // This function is called at each byte read
+//!    //   `el_buf` contains the value of the byte
+//!    //   `pos` contains the position matched
+//!    fn sequel(&mut self, el_buf: u8, pos: usize) -> MatchResult {
+//!        if pos == 0 {
+//!            if el_buf == b'\r' || el_buf == b'\n' {
+//!                self.prev_char = el_buf;
+//!                MatchResult::NeedNext
+//!            } else {
+//!                MatchResult::Mismatch
+//!            }
+//!        } else if pos == 1 {
+//!            if el_buf == b'\n' && self.prev_char == b'\r' {
+//!                MatchResult::Match(0, 0) //We are on \r\n
+//!            } else {
+//!                MatchResult::Match(0, 1) //We have to ignore the last byte since it's not a part of the end of line pattern
+//!            }
+//!        } else {
+//!            panic!("We can't reach this code since we just manage 2 positions")
+//!        }
+//!    }
+//!
+//!    // This function is called at the end of the buffer, useful to manage partial cases
+//!    fn sequel_eos(&mut self, pos: usize) -> MatchResult {
+//!        if pos == 0 {
+//!            MatchResult::Match(0, 0) //Here the last char is \r or \n, at position 0
+//!        } else {
+//!            panic!("We can't reach this code since we just manage 2 positions")
+//!        }
+//!    }
+//!}
+//!```
+//!...so the reader can be created like this :\
+//!`let mut reader = BufReadSplitter::new( &mut input_reader, AllEndOfLineMatcher::new(), Options::default() );`
+//!
+//!The separator pattern can be changed on the fly by calling the function `matcher` :\
+//!`reader.matcher(SimpleMatcher::new(b"<CHANGE SEP>"))`
+//!
+//!The size of the buffer part can be limited.\
+//!For example to limit the buffer part to read only 100 bytes :\
+//!`reader.set_limit_read(Some(100));`\
+//!...and to reinitialize it :\
+//!`reader.set_limit_read(None);`\
+//!
+//!
+//!A call to `.next_part()` pass to the next part, however the end was reached or not, so it skips what has not been readed.
+//!
+//!
+//!For debug purpose, you can activate the "log" features in the Cargo.toml :\
+//!`[dependencies]`\
+//!`buf_read_splitter = { path = "../buf_read_splitter_v0.3/buf_read_splitter", features = ["log",] }`
+//!
+//!
+//!For more information :\
+//!- [https://docs.rs/buf_read_splitter/latest/buf_read_splitter/]\
+//!- [https://crates.io/crates/buf_read_splitter]
+//!
+//!A suggestion or bug alert ? Feel free to fill an issue :\
+//!- [https://github.com/flogbl/buf_read_splitter/issues]
+//!
+//!You can also contact me :
+//!- [https://github.com/flogbl]
+//!
+//!Thanks for your interest!
+//!
 pub mod buf_read_splitter;
+pub mod match_result;
+pub mod matcher;
+pub mod options;
+pub mod simple_matcher;
+
+// private
+mod buf_ext;
+mod buf_ext_iter;

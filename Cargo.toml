@@ -1,8 +1,8 @@
 [package]
 name = "buf_read_splitter"
-version = "3.0.0"
+version = "0.3.0"
 edition = "2021"
-description = "Buffer reader that has the capacity to split(stop) on a giving [u8] separator"
+description = "Stream reader in buffer with capacity to split(stop) on a giving pattern (usually &[u8])"
 repository = "https://github.com/flogbl/buf_read_splitter"
 license = "MIT"
 exclude = [".gitignore"]

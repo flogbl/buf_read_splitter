@@ -1,8 +1,8 @@
 # buf_read_splitter
 
-**buf_read_splitter** eases the way to read a buffer that has to stop on a defined pattern (like an array of [u8])
+**buf_read_splitter** eases the way to read a stream inside a fixed length buffer, that has to stop on a defined pattern (like an array of [u8], but it can be more complex)
 
-This could be a simple separator :
+Below an example where the separator is an array of bytes :
 ```rust
 use std::io::Read;
 use buf_read_splitter::{
@@ -62,8 +62,8 @@ assert_eq!(&words[3], "Fourth");
 assert_eq!(&words[4], "Fifth");
 ```
 
-This can be also a more complex pattern. It's done by implementing the trait `Matcher`.\
-For example a Matcher able to split a stream at each Mac, Unix or Windows end of line :
+But it can also be a more complex pattern. \
+For example below a Matcher able to split a stream at each Mac, Unix or Windows end of line :
 ```rust
 use buf_read_splitter::{
        match_result::MatchResult,
@@ -118,7 +118,7 @@ The separator pattern can be changed on the fly by calling the function `matcher
 `reader.matcher(SimpleMatcher::new(b"<CHANGE SEP>"))`
 
 The size of the buffer part can be limited.\
-For example to limit the buffer part to read only 100 bytes :\
+For example to limit the stream to read only 100 bytes :\
 `reader.set_limit_read(Some(100));`\
 ...and to reinitialize it :\
 `reader.set_limit_read(None);`\

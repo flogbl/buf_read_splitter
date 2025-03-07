@@ -1,8 +1,8 @@
 # buf_read_splitter
 
-**buf_read_splitter** as the ability to read a stream inside a fixed length buffer, reading until defined pattern (like an array of [u8], or it more complex pattern)
+**buf_read_splitter** as the ability to read a stream inside a buffer(fixed length or not), reading until defined pattern (like an array of [u8], or it more complex pattern)
 
-Below an example where the separator is an array of bytes :
+Below an example with a separator as an array of bytes :
 
 ```rust
 use std::io::Read;

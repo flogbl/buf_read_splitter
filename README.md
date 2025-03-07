@@ -1,8 +1,9 @@
 # buf_read_splitter
 
-**buf_read_splitter** eases the way to read a stream inside a fixed length buffer, that has to stop on a defined pattern (like an array of [u8], but it can be more complex)
+**buf_read_splitter** as the ability to read a stream inside a fixed length buffer, reading until defined pattern (like an array of [u8], or it more complex pattern)
 
 Below an example where the separator is an array of bytes :
+
 ```rust
 use std::io::Read;
 use buf_read_splitter::{
@@ -64,6 +65,7 @@ assert_eq!(&words[4], "Fifth");
 
 But it can also be a more complex pattern. \
 For example below a Matcher able to split a stream at each Mac, Unix or Windows end of line :
+
 ```rust
 use buf_read_splitter::{
        match_result::MatchResult,
@@ -111,6 +113,7 @@ impl Matcher for AllEndOfLineMatcher {
    }
 }
 ```
+
 ...so the reader can be created like this :\
 `let mut reader = BufReadSplitter::new( &mut input_reader, AllEndOfLineMatcher::new(), Options::default() );`
 
@@ -123,26 +126,25 @@ For example to limit the stream to read only 100 bytes :\
 ...and to reinitialize it :\
 `reader.set_limit_read(None);`\
 
-
 A call to `.next_part()` pass to the next part, however the end was reached or not, so it skips what has not been readed.
-
 
 For debug purpose, you can activate the "log" features in the Cargo.toml :\
 `[dependencies]`\
 `buf_read_splitter = { path = "../buf_read_splitter_v0.3/buf_read_splitter", features = ["log",] }`
 
-
 For more information :\
+
 - [https://docs.rs/buf_read_splitter/latest/buf_read_splitter/]\
 - [https://crates.io/crates/buf_read_splitter]
 
 A suggestion or bug alert ? Feel free to fill an issue :\
+
 - [https://github.com/flogbl/buf_read_splitter/issues]
 
 You can also contact me :
+
 - [https://github.com/flogbl]
 
 Thanks for your interest!
-
 
 License: MIT

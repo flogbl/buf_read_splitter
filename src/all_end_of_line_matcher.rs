@@ -1,7 +1,7 @@
 use crate::match_result::MatchResult;
 use crate::matcher::Matcher;
 
-struct AllEndOfLineMatcher {
+pub struct AllEndOfLineMatcher {
     prev_char: u8,
 }
 impl AllEndOfLineMatcher {

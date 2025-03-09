@@ -134,6 +134,7 @@ pub mod match_result;
 pub mod matcher;
 pub mod options;
 pub mod simple_matcher;
+pub mod all_end_of_line_matcher;
 
 // private
 mod buf_ext;

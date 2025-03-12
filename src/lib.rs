@@ -1,4 +1,4 @@
-//!**buf_read_splitter** eases the way to read a buffer that has to stop on a defined pattern (like an array of [u8])
+//!**buf_read_splitter** as the ability to read a stream inside a fixed length buffer, reading until defined pattern (like an array of [u8], or it more complex pattern)
 //!
 //!This could be a simple separator :
 //!```rust
@@ -129,24 +129,12 @@
 //!`[dependencies]`\
 //!`buf_read_splitter = { path = "../buf_read_splitter_v0.3/buf_read_splitter", features = ["log",] }`
 //!
-//!
-//!For more information :\
-//!- [https://docs.rs/buf_read_splitter/latest/buf_read_splitter/]\
-//!- [https://crates.io/crates/buf_read_splitter]
-//!
-//!A suggestion or bug alert ? Feel free to fill an issue :\
-//!- [https://github.com/flogbl/buf_read_splitter/issues]
-//!
-//!You can also contact me :
-//!- [https://github.com/flogbl]
-//!
-//!Thanks for your interest!
-//!
 pub mod buf_read_splitter;
 pub mod match_result;
 pub mod matcher;
 pub mod options;
 pub mod simple_matcher;
+pub mod all_end_of_line_matcher;
 
 // private
 mod buf_ext;

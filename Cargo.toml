@@ -2,7 +2,7 @@
 name = "buf_read_splitter"
 version = "0.3.0"
 edition = "2021"
-description = "Stream reader in buffer with capacity to split(stop) on a giving pattern (usually &[u8])"
+description = "Stream reader with capacity to split(stop) on a defined pattern (usually &[u8] but can also more complex pattern)"
 repository = "https://github.com/flogbl/buf_read_splitter"
 license = "MIT"
 exclude = [".gitignore"]

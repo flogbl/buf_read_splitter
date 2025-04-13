@@ -1,6 +1,6 @@
 [package]
 name = "buf_read_splitter"
-version = "0.4.0"
+version = "0.4.1"
 edition = "2021"
 description = "A stream reader with ability to read a stream until a defined pattern is reached (usually an array of [u8])"
 repository = "https://github.com/flogbl/buf_read_splitter"

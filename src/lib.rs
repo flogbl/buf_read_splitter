@@ -46,7 +46,7 @@
 //!assert_eq!(&words[4], "Fifth");
 //!assert_eq!(words.len(), 5);
 //!```
-//!
+//!\
 //!For more complexe pattern, the trait `Matcher` has to be implementing.\
 //!For example above a Matcher able to split a stream at each Mac, Unix or Windows end of line :
 //!```rust
@@ -99,7 +99,7 @@
 //!    }
 //!}
 //!```
-//!...so the reader can be created like this :
+//!...so the reader can be created like with this code :
 //!```no_run
 //! let mut reader = BufReadSplitter::new(
 //!                             &mut input_reader,
@@ -107,12 +107,12 @@
 //!                             Options::default()
 //!                             );
 //!```
-//!
-//!The separator pattern can be changed on the fly by calling the "`matcher`" :
+//!\
+//!The separator pattern can be changed on the fly by calling "`matcher`" function :
 //!```no_run
 //!reader.matcher(SimpleMatcher::new(b"<CHANGE SEP>"))
 //!```
-//!
+//!\
 //!The buffer part can be limited in size readed.\
 //!For example to limit to 100 bytes :
 //!```no_run
@@ -123,10 +123,10 @@
 //!reader.set_limit_read(None);
 //!```
 //!
-//!
+//!\
 //!A call to "`.next_part()`" pass to the next part, however the end was reached or not (skips what has not been readed)\
 //!
-//!
+//!\
 //!For debug purpose, you can activate the "log" features in the Cargo.toml (slow down processing) :
 //!```no_run
 //![dependencies]

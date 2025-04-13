@@ -1,7 +1,7 @@
 use core::fmt;
 use std::{cmp, ops::Range};
 
-use crate::buf_ext_iter::BufExtIter;
+use crate::BufExtIter;
 
 pub struct BufExt<'a> {
     reader: &'a mut dyn std::io::Read, // The stream to read

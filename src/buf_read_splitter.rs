@@ -1,10 +1,10 @@
 use core::fmt;
 use std::{cmp, io::Read};
 
-use crate::buf_ext::BufExt;
-use crate::match_result::MatchResult;
-use crate::matcher::Matcher;
-use crate::options::Options;
+use crate::BufExt;
+use crate::MatchResult;
+use crate::Matcher;
+use crate::Options;
 
 type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 

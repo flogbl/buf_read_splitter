@@ -1,4 +1,4 @@
-use crate::buf_ext::BufExt;
+use crate::BufExt;
 
 pub struct BufExtIter<'a, 'b> {
     buf_ext: &'a mut BufExt<'b>,

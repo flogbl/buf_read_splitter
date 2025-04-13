@@ -1,8 +1,8 @@
 [package]
 name = "buf_read_splitter"
-version = "0.3.0"
+version = "0.4.0"
 edition = "2021"
-description = "Stream reader with capacity to split(stop) on a defined pattern (usually &[u8] but can also more complex pattern)"
+description = "A stream reader with ability to read a stream until a defined pattern is reached (usually an array of [u8])"
 repository = "https://github.com/flogbl/buf_read_splitter"
 license = "MIT"
 exclude = [".gitignore"]

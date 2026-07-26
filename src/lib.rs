@@ -100,7 +100,7 @@
 //!}
 //!```
 //!...so the reader can be created like with this code :
-//!```no_run
+//!```ignore
 //! let mut reader = BufReadSplitter::new(
 //!                             &mut input_reader,
 //!                             AllEndOfLineMatcher::new(),
@@ -109,17 +109,17 @@
 //!```
 //!\
 //!The separator pattern can be changed on the fly by calling "`matcher`" function :
-//!```no_run
+//!```ignore
 //!reader.matcher(SimpleMatcher::new(b"<CHANGE SEP>"))
 //!```
 //!\
 //!The buffer part can be limited in size readed.\
 //!For example to limit to 100 bytes :
-//!```no_run
+//!```ignore
 //!reader.set_limit_read(Some(100));
 //!```
 //!...and to reinitialize it to "no limit" :
-//!```no_run
+//!```ignore
 //!reader.set_limit_read(None);
 //!```
 //!
@@ -128,7 +128,7 @@
 //!
 //!\
 //!For debug purpose, you can activate the "log" features in the Cargo.toml (slow down processing) :
-//!```no_run
+//!```ignore
 //![dependencies]
 //!buf_read_splitter = {"0.4", features = ["log"] }
 //!```

@@ -7,12 +7,20 @@ repository = "https://github.com/flogbl/buf_read_splitter"
 license = "MIT"
 exclude = [".gitignore"]
 
+[features]
+default = []
+#default = ["log"]
+log = ["dep:log", "dep:format_hex", "dep:env_logger"]
+
 [dependencies]
 env_logger = { version = "0.7", optional = true }
 log = { version = "0.4", optional = true }
 format_hex = { version = "0.1", optional = true }
 
-[features]
-default = []
-#default = ["log"]
-log = ["dep:log", "dep:format_hex", "dep:env_logger"]
+[dev-dependencies]
+divan = "0.1.21"
+tokio = { version = "1", features = ["full"] }
+
+[[bench]]
+name = "main"
+harness = false

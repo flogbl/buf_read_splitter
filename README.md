@@ -1,6 +1,6 @@
 # buf_read_splitter
 
-A stream reader with the ability to read a stream until a defined pattern is reached (usually an array of [u8])
+A stream reader with the ability to read a stream until a defined pattern is reached (usually an array of [u8]).
 Priority is given to low memory and CPU usage.
 Non async.
 

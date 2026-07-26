@@ -1,6 +1,7 @@
 # buf_read_splitter
 
 A stream reader with ability to read a stream until a defined pattern is reached (usually an array of [u8])
+Priority is given to low memory and CPU usage.
 
 This could be a simple separator :
 ```rust
@@ -49,8 +50,8 @@ assert_eq!(&words[4], "Fifth");
 assert_eq!(words.len(), 5);
 ```
 \
-For more complexe pattern, the trait `Matcher` has to be implementing.\
-For example above a Matcher able to split a stream at each Mac, Unix or Windows end of line :
+For more complexe pattern, the trait `Matcher` has to be implemented.\
+In the example above a Matcher able to split a stream at each Mac, Unix or Windows end of line (note the use of the position in the separator determination function) :
 ```rust
 use buf_read_splitter::{
        MatchResult,
@@ -110,7 +111,7 @@ let mut reader = BufReadSplitter::new(
                             );
 ```
 \
-The separator pattern can be changed on the fly by calling "`matcher`" function :
+The separator pattern can be changed on the fly by calling the "`matcher`" function :
 ```rust
 reader.matcher(SimpleMatcher::new(b"<CHANGE SEP>"))
 ```
@@ -129,7 +130,7 @@ reader.set_limit_read(None);
 A call to "`.next_part()`" pass to the next part, however the end was reached or not (skips what has not been readed)\
 
 \
-For debug purpose, you can activate the "log" features in the Cargo.toml (slow down processing) :
+For debug purpose, you can activate the "log" features in the Cargo.toml (slow down the processing) :
 ```rust
 [dependencies]
 buf_read_splitter = {"0.4", features = ["log"] }

@@ -1,10 +1,10 @@
 # buf_read_splitter
 
-A stream reader with the ability to read a stream until a defined pattern is reached (usually an array of [u8]).
-Priority is given to low memory and CPU usage.
-Non async.
+Allows detecting specific separators when reading a Stream in buffers. These separators are highly parametrizable. I initially wrote this library because `read_until` one and only only one char.
+Priority is given to low memory. CPU usage seems OK (try `cargo bench`)
+This library do not use async.
 
-This could be a simple separator :
+The separator could be a simple one :
 ```rust
 use std::io::Read;
 use buf_read_splitter::{BufReadSplitter,MatchResult,Options,SimpleMatcher};
@@ -131,7 +131,7 @@ reader.set_limit_read(None);
 A call to "`.next_part()`" pass to the next part, however the end was reached or not (skips what has not been readed)\
 
 \
-For debug purpose, you can activate the "log" features in the Cargo.toml (slow down the processing) :
+For debug purpose, you can activate the "log" features in the Cargo.toml (note that it slows down the processing) :
 ```rust
 [dependencies]
 buf_read_splitter = {"0.4", features = ["log"] }

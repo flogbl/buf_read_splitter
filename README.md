@@ -1,6 +1,6 @@
 # buf_read_splitter
 
-Allows detecting specific separators when reading a Stream in buffers. These separators are highly parametrizable. I initially wrote this library because `read_until` one and only only one char.
+Allows detecting specific separators when reading a Stream in a buffer. These separators are highly parametrizable. I initially wrote this library because `read_until` one and only only one char.
 Priority is given to low memory. CPU usage seems OK (try `cargo bench`)
 This library do not use async.
 

@@ -24,3 +24,6 @@ tokio = { version = "1", features = ["full"] }
 [[bench]]
 name = "main"
 harness = false
+
+[profile.release]
+debug = true

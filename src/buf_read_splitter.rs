@@ -16,7 +16,7 @@ pub struct BufReadSplitter<'a, T: Matcher> {
     buf_extend: BufExt<'a>, // Extend buffer, need to detecte the matched part overflowing the output buffer
     options: Options,       // Options stores here
     matched: bool,          // Indicate that the pattern is matched
-    curr_limit_read: Option<usize>, // Counter of the limit to read
+    curr_limit_read: Option<usize>, // Counter for the size limit to read
     remain: usize,
     #[cfg(feature = "log")]
     log_call_read: usize,

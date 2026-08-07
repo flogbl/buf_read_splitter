@@ -156,4 +156,4 @@ mod buf_ext;
 use buf_ext::BufExt;
 
 mod buf_ext_iter;
-use buf_ext_iter::BufExtIter;
+use buf_ext_iter::BufGrowingExtIter;

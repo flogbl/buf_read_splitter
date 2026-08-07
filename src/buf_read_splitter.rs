@@ -140,10 +140,22 @@ impl<'a, T: Matcher> BufReadSplitter<'a, T> {
             let mut sz_read = 0;
 
             // First, feed the output buffer consuming datas of the previous read
+            //todo: Is it necessarly ? If there's a match into the extended_buffer, we just have to feed the buffer by the part before
             if self.buf_extend.len() > 0 {
-                sz_read = self.buf_extend.pop_buf_into(buf);
+                let mut sz_matched = 0usize; //Size matched
+                let mut pos = 0usize; //Absolute position of the last position that matched
+                let state = self.search_match_in_buf_extend(&mut sz_matched, &mut pos)?;
+                if let MatchResult::Match(take_left, take_right) = state {
+                    let (sz_returned, pos_returned) =
+                        Self::convert_take_to_pos_sz(take_left, take_right, sz_matched, pos);
+                    sz_read = self.buf_extend.pop_buf_into(&mut buf[..=pos_returned]);
+                    self.buf_extend.drain(0..sz_returned);
+                } else {
+                    sz_read = self.buf_extend.pop_buf_into(buf)
+                }
             }
             // Feed the remaining part by consumming the input buffer
+            //todo: is necessary if there's a match inside it ?
             if sz_read < buf.len() {
                 sz_read += self.buf_extend.read_direct(&mut buf[sz_read..])?;
             }
@@ -169,6 +181,8 @@ impl<'a, T: Matcher> BufReadSplitter<'a, T> {
                     };
 
                     // Save the part next to the matched part if there's one
+                    // (we have to push at the begin because the buffer can contains)
+                    //todo: is there a more simple way ?
                     if abs_end < buf.len() {
                         self.buf_extend.push_at_begin(&buf[abs_end..sz_read]);
                     }
@@ -213,75 +227,104 @@ impl<'a, T: Matcher> BufReadSplitter<'a, T> {
         }
     }
     ///
+    ///
+    fn convert_take_to_pos_sz(
+        take_left: usize,
+        take_right: usize,
+        sz_matched: usize,
+        pos: usize,
+    ) -> (usize, usize) {
+        if take_left + take_right > sz_matched {
+            panic!("Size matched overflow ! take_left={take_left} + take_right={take_left} > sz_matched={sz_matched}")
+        }
+        let sz_returned = sz_matched - take_left - take_right;
+        let pos_returned = pos - take_right;
+        (sz_returned, pos_returned)
+    }
+    ///
     /// Searching for a match in buf and buf_ext
     fn search_match(
         &mut self,
-        buf: &mut [u8],
+        buf: &[u8],
         sz_read: usize,
     ) -> std::io::Result<Option<(usize, usize)>> {
-        let mut sz_matched = 0; //Size matched
+        // Initialize
+        let mut sz_matched = 0usize; //Size matched
         let mut pos = 0usize; //Absolute position of the last position that matched
 
-        // For factorisation of the common part in the two loops
-        let fn_calc_returned = |take_left: usize,
-                                take_right: usize,
-                                sz_matched: usize,
-                                pos: usize| {
-            if take_left + take_right > sz_matched {
-                panic!("Size matched overflow ! take_left={take_left} + take_right={take_left} > sz_matched={sz_matched}")
-            }
-            let sz_returned = sz_matched - take_left - take_right;
-            let pos_returned = pos - take_right;
-            (sz_returned, pos_returned)
-        };
-
-        // Search in buf
-        for el in buf[..sz_read].into_iter() {
-            match self.matcher.sequel(*el, sz_matched) {
-                MatchResult::NeedNext => sz_matched += 1,
-                MatchResult::Match(take_left, take_right) => {
-                    sz_matched += 1;
-                    let res = fn_calc_returned(take_left, take_right, sz_matched, pos);
-                    return Ok(Some(res));
-                }
-                MatchResult::Mismatch => sz_matched = 0,
-            }
-            pos += 1;
+        // Search in the buffer
+        let mut state = self.search_match_in_buffer(buf, sz_read, &mut sz_matched, &mut pos);
+        if matches!(state, MatchResult::NeedNext) {
+            // Search in the extended buffer
+            state = self.search_match_in_buf_extend(&mut sz_matched, &mut pos)?;
         }
 
-        if sz_matched == 0 {
-            Ok(None)
-        } else
-        // Continue to search in buf_ext if needed
-        {
-            let it = self.buf_extend.iter_growing();
-            for res in it {
-                let el = res?;
-                match self.matcher.sequel(el, sz_matched) {
-                    MatchResult::NeedNext => {
-                        sz_matched += 1;
-                    }
-                    MatchResult::Match(take_left, take_right) => {
-                        sz_matched += 1;
-                        let res = fn_calc_returned(take_left, take_right, sz_matched, pos);
-                        return Ok(Some(res));
-                    }
-                    MatchResult::Mismatch => return Ok(None),
-                }
-                pos += 1;
+        match state {
+            MatchResult::Mismatch => Ok(None),
+            MatchResult::Match(take_left, take_right) => {
+                let res = Self::convert_take_to_pos_sz(take_left, take_right, sz_matched, pos);
+                Ok(Some(res))
             }
-            // We arrived here because in NeedNext state, so we have to manage the EOS call
-            if false == self.buf_extend.eos_reached() {
-                Ok(None)
-            } else {
-                match self.matcher.sequel_eos(sz_matched - 1) {
-                    MatchResult::Match(take_left, take_right) => {
-                        let res = fn_calc_returned(take_left, take_right, sz_matched, pos - 1);
-                        Ok(Some(res))
-                    }
-                    _ => Ok(None),
-                }
+            MatchResult::NeedNext => {
+                panic!("Abnormal case: normally there's no stop until end is reached")
             }
+        }
+    }
+
+    fn search_match_in_buffer(
+        &mut self,
+        buf: &[u8],
+        sz_read: usize,
+        sz_matched: &mut usize,
+        pos: &mut usize,
+    ) -> MatchResult {
+        let mut latest_state = MatchResult::Mismatch;
+        for el in buf[..sz_read].into_iter() {
+            latest_state = self.matcher.sequel(*el, *sz_matched);
+            match latest_state {
+                MatchResult::NeedNext => *sz_matched += 1,
+                MatchResult::Match(_, _) => {
+                    *sz_matched += 1;
+                    return latest_state;
+                }
+                MatchResult::Mismatch => *sz_matched = 0,
+            }
+            *pos += 1;
+        }
+        latest_state
+    }
+
+    fn search_match_in_buf_extend(
+        &mut self,
+        sz_matched: &mut usize,
+        pos: &mut usize,
+    ) -> std::io::Result<MatchResult> {
+        // We are here because the begin of the potentiel pattern has been found in the buffer part, so we have
+        // to determine if it is really matched or not to stop the buffer.
+        let it = self.buf_extend.iter_growing();
+        for res in it {
+            let state = self.matcher.sequel(res?, *sz_matched);
+            match state {
+                MatchResult::NeedNext => {
+                    *sz_matched += 1;
+                }
+                MatchResult::Match(_, _) => {
+                    *sz_matched += 1;
+                    return Ok(state);
+                }
+                MatchResult::Mismatch => return Ok(state),
+            }
+            *pos += 1;
+        }
+        // We are at the end of the stream => we manage the EOS call
+        if false == self.buf_extend.eos_reached() {
+            Ok(MatchResult::Mismatch)
+        } else {
+            let state = self.matcher.sequel_eos(*sz_matched - 1);
+            if matches!(state, MatchResult::Match(_, _)) {
+                *pos -= 1;
+            }
+            Ok(state)
         }
     }
     ///

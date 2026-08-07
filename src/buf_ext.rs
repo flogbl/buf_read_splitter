@@ -1,7 +1,7 @@
 use core::fmt;
 use std::{cmp, ops::Range};
 
-use crate::BufExtIter;
+use crate::BufGrowingExtIter;
 
 pub struct BufExt<'a> {
     reader: &'a mut dyn std::io::Read, // The stream to read
@@ -89,8 +89,8 @@ impl<'a> BufExt<'a> {
     }
     ///
     /// To iterate
-    pub fn iter_growing<'b>(&'b mut self) -> BufExtIter<'b, 'a> {
-        BufExtIter::new(self)
+    pub fn iter_growing<'b>(&'b mut self) -> BufGrowingExtIter<'b, 'a> {
+        BufGrowingExtIter::new(self)
     }
     #[allow(dead_code)]
     pub fn cloned_internal_vec(&self) -> Vec<u8> {

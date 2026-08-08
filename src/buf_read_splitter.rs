@@ -74,7 +74,7 @@ impl<'a, T: Matcher> BufReadSplitter<'a, T> {
             #[cfg(feature = "log")]
             log::debug!("Set matched to FALSE");
 
-            self.matched = false; // We are now on the next buffer, nothing even read, nothing even matched
+            self.matched = false; // We are now at the next buffer, nothing even read, nothing even matched
             self.curr_limit_read = self.options.limit_read;
             Ok(Some(())) // It had just been stopping because it reached the separator
         }
@@ -153,14 +153,14 @@ impl<'a, T: Matcher> BufReadSplitter<'a, T> {
                     let ps_bufext = PosSizeHelper::from_relative(&ps_absolute, buf.len());
 
                     // Save the part next to the matched part if there's one
-                    // (we have to push at the begin because the buffer can contains)
+                    // (we have to push at the begin because the buffer can already contains datas)
                     //todo: is there a simpler way ?
                     if ps_absolute.next_content_pos() < buf.len() {
                         self.buf_extend
                             .push_at_begin(&buf[ps_absolute.next_content_pos()..sz_read]);
                     }
 
-                    // If a part of the buf_extend must have not to be returned, we remove it
+                    // If a part of the buf_extend have not to be returned, we remove it
                     if ps_bufext.next_content_pos() > 0 {
                         self.buf_extend
                             .drain(ps_bufext.skipped_pos()..ps_bufext.next_content_pos());

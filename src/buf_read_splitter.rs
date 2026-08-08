@@ -140,25 +140,7 @@ impl<'a, T: Matcher> BufReadSplitter<'a, T> {
             let mut sz_read = 0;
 
             if self.buf_extend.len() > 0 {
-                let mut sz_matched = 0usize; //Size matched
-                let mut pos = 0usize; //Absolute position of the last position that matched
-                let state = self.search_match_in_buf_extend(&mut sz_matched, &mut pos)?;
-                if let MatchResult::Match(take_left, take_right) = state {
-                    let ps = PosSizeHelper::from_match(take_left, take_right, sz_matched, pos);
-                    sz_read = self.buf_extend.pop_buf_into(&mut buf[..ps.skipped_pos()]);
-                    self.buf_extend.drain(0..ps.skipped_len());
-
-                    // The next read have to stop the read (return sz_read=0)
-                    self.matched = true;
-                    self.remain = 0;
-                    return Ok(sz_read);
-                } else {
-                    sz_read = self.buf_extend.pop_buf_into(buf);
-                }
-
-                /*
                 sz_read = self.buf_extend.pop_buf_into(buf);
-                */
             }
             // Feed the remaining part by consumming the input buffer
             //todo: is necessary if there's a match inside it ?

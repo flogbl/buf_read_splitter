@@ -49,9 +49,4 @@ impl PosSizeHelper {
     pub fn skipped_pos(&self) -> usize {
         self.skipped_pos
     }
-    ///
-    ///
-    pub fn skipped_len(&self) -> usize {
-        self.next_content_pos - self.skipped_pos
-    }
 }

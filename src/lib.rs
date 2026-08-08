@@ -134,8 +134,6 @@
 //!```
 //!
 
-#![feature(deque_extend_front)]
-
 mod all_end_of_line_matcher;
 pub use all_end_of_line_matcher::AllEndOfLineMatcher;
 
@@ -155,8 +153,8 @@ mod simple_matcher;
 pub use simple_matcher::SimpleMatcher;
 
 // private
-mod buf_ext_____vecdeque;
-use buf_ext_____vecdeque::BufExt;
+mod buf_ext;
+use buf_ext::BufExt;
 
 mod buf_ext_iter;
 use buf_ext_iter::BufGrowingExtIter;

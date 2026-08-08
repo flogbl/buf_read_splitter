@@ -16,7 +16,7 @@ mod tests {
 
     #[test]
     fn count_buf_read_splitter() {
-        let content_len = 100;
+        let content_len = 10;
         let nbr_of_iterations = 10_000_000 / content_len;
         let separator = "<SEP>";
         let mut stream = StreamGenerator::new(content_len, separator, nbr_of_iterations);

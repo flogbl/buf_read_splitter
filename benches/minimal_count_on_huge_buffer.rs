@@ -1,16 +1,57 @@
+///
+/// This test aims to verify there's no performance problem with huge buffers
+///
 #[path = "common/mod.rs"]
 mod common;
 
+use buf_read_splitter::{BufReadSplitter, Options, SimpleMatcher};
 use common::stream_generator::StreamGenerator;
 use std::io::Read;
 
+const BUF_SIZE: usize = 100_000;
+
 #[divan::bench(args = [10, 100, 1_000, 10_000, 100_000])]
-fn minimal_count(content_len: usize) {
+fn count_buf_read_splitter(content_len: usize) {
     let nbr_of_iterations = 10_000_000 / content_len;
     let separator = "<SEP>";
     let mut stream = StreamGenerator::new(content_len, separator, nbr_of_iterations);
 
-    let mut buf = vec![0u8; 255];
+    let mut reader = BufReadSplitter::new(
+        &mut stream,
+        SimpleMatcher::new(separator.as_bytes()),
+        Options::default(),
+    );
+
+    let mut buf = vec![0u8; BUF_SIZE];
+
+    let mut nb_part_found = 0usize;
+
+    while {
+        let sz = reader.read(&mut buf).unwrap();
+        if sz > 0 {
+            true
+        } else {
+            nb_part_found += 1;
+            match reader.next_part().unwrap() {
+                //Pass to the next part of the buffer
+                Some(_) => true, //There's a next part
+                None => false,   //End of the stream
+            }
+        }
+    } {}
+    assert!(
+        nb_part_found == nbr_of_iterations,
+        "nb_found different of nbr_of_iterations ( {nb_part_found} != {nbr_of_iterations} )"
+    )
+}
+
+#[divan::bench(args = [10, 100, 1_000, 10_000, 100_000])]
+fn count_minimaliste(content_len: usize) {
+    let nbr_of_iterations = 10_000_000 / content_len;
+    let separator = "<SEP>";
+    let mut stream = StreamGenerator::new(content_len, separator, nbr_of_iterations);
+
+    let mut buf = vec![0u8; BUF_SIZE];
     let mut nb_sep_found = 0usize;
 
     let mut pos_found = 0usize;

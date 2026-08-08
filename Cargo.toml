@@ -19,11 +19,7 @@ format_hex = { version = "0.1", optional = true }
 
 [dev-dependencies]
 divan = "0.1.21"
-tokio = { version = "1", features = ["full"] }
 
 [[bench]]
 name = "main"
 harness = false
-
-[profile.release]
-debug = true

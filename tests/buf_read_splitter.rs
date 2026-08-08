@@ -517,7 +517,6 @@ mod tests {
                 Ok(sz) => {
                     #[cfg(feature = "log")]
                     log::debug!("sz={sz}");
-
                     if sz == 0 {
                         text.push('.');
                         match reader.next_part() {

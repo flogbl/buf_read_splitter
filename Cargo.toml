@@ -23,3 +23,18 @@ divan = "0.1.21"
 [[bench]]
 name = "main"
 harness = false
+
+# To use flamegraph
+# Command example : cargo flamegraph --test count_on_huge_buffer
+#[profile.release]
+#debug = true
+#strip = false
+
+# for speed
+[profile.release]
+opt-level = 3          # Niveau d'optimisation maximal (0-3)
+lto = "fat"            # Link-Time Optimization (améliore les performances)
+codegen-units = 1      # Moins d'unités de génération de code = meilleures optimisations (mais compilation plus lente)
+panic = "abort"        # Désactive les messages de panique pour réduire la taille
+strip = true           # Supprime les symboles de débogage (réduit la taille du binaire)
+target-cpu = "native"  # Optimise pour le CPU de la machine hôte

@@ -37,4 +37,4 @@ lto = "fat"            # Link-Time Optimization (améliore les performances)
 codegen-units = 1      # Moins d'unités de génération de code = meilleures optimisations (mais compilation plus lente)
 panic = "abort"        # Désactive les messages de panique pour réduire la taille
 strip = true           # Supprime les symboles de débogage (réduit la taille du binaire)
-target-cpu = "native"  # Optimise pour le CPU de la machine hôte
+#target-cpu = "native"  # Optimise pour le CPU de la machine hôte

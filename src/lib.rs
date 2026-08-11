@@ -159,8 +159,8 @@ pub use errors::*;
 mod buf_ext;
 use buf_ext::BufExt;
 
-mod buf_ext_iter;
-use buf_ext_iter::BufGrowingExtIter;
+mod buf_growing_ext_iter;
+use buf_growing_ext_iter::BufGrowingExtIter;
 
 mod pos_size_helper;
 use pos_size_helper::PosSizeHelper;

@@ -152,6 +152,9 @@ pub use options::Options;
 mod simple_matcher;
 pub use simple_matcher::SimpleMatcher;
 
+mod errors;
+pub use errors::*;
+
 // private
 mod buf_ext;
 use buf_ext::BufExt;

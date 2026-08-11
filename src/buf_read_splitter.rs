@@ -1,13 +1,12 @@
 use core::fmt;
 use std::{cmp, io::Read};
 
+use crate::errors::*;
 use crate::BufExt;
 use crate::MatchResult;
 use crate::Matcher;
 use crate::Options;
 use crate::PosSizeHelper;
-
-type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
 
 ///
 /// BufReadSplitter : See unit test or lib documentations for an example

@@ -14,8 +14,9 @@ log = ["dep:log", "dep:format_hex", "dep:env_logger"]
 
 [dependencies]
 env_logger = { version = "0.7", optional = true }
-log = { version = "0.4", optional = true }
 format_hex = { version = "0.1", optional = true }
+log = { version = "0.4", optional = true }
+thiserror = "2"
 
 [dev-dependencies]
 divan = "0.1.21"

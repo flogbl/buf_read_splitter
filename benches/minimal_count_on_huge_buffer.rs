@@ -1,20 +1,49 @@
 ///
-/// This test aims to verify there's no performance problem with huge buffers
+/// This test aims to verify there's no performance problem with
+/// huge buffers on small chunks (10 octets)
 ///
+
 #[path = "common/mod.rs"]
 mod common;
 
 use buf_read_splitter::{BufReadSplitter, Options, SimpleMatcher};
-use common::stream_generator::StreamGenerator;
 use std::io::Read;
 
-const BUF_SIZE: usize = 100_000;
+use crate::common::procinfo::*;
+use crate::common::stream_generator::*;
 
-#[divan::bench(args = [10, 100, 1_000, 10_000, 100_000])]
-fn count_buf_read_splitter(content_len: usize) {
-    let nbr_of_iterations = 10_000_000 / content_len;
+const BUF_SIZE: usize = 100_000;
+const CONTENT_LEN: usize = 10;
+
+pub fn bench() {
+    let mut proc_info = ProcInfo::new();
+
+    let cpu1_before = proc_info.cpu_time();
+    buf_read_splitter();
+    let cpu1_after = proc_info.cpu_time();
+    let cpu2_before = proc_info.cpu_time();
+    count_minimaliste();
+    let cpu2_after = proc_info.cpu_time();
+
+    // Report
+    println!("|{}|", "-".repeat(23));
+    println!(
+        "|  {:>6.3}   |  {:>6.3}   |",
+        "buf_read_splitter", "minimal_count"
+    );
+    println!("|{}|", "-".repeat(23));
+    println!(
+        "| {:>6.3} ms | {:>6.3} ms |",
+        cpu1_after - cpu1_before,
+        cpu2_after - cpu2_before
+    );
+    println!("|{}|", "-".repeat(23));
+}
+
+fn buf_read_splitter() {
+    let nbr_of_iterations = 10_000_000 / CONTENT_LEN;
     let separator = "<SEP>";
-    let mut stream = StreamGenerator::new(content_len, separator, nbr_of_iterations);
+    let mut stream = StreamGenerator::new(CONTENT_LEN, separator, nbr_of_iterations);
 
     let mut reader = BufReadSplitter::new(
         &mut stream,
@@ -45,11 +74,10 @@ fn count_buf_read_splitter(content_len: usize) {
     )
 }
 
-#[divan::bench(args = [10, 100, 1_000, 10_000, 100_000])]
-fn count_minimaliste(content_len: usize) {
-    let nbr_of_iterations = 10_000_000 / content_len;
+fn count_minimaliste() {
+    let nbr_of_iterations = 10_000_000 / CONTENT_LEN;
     let separator = "<SEP>";
-    let mut stream = StreamGenerator::new(content_len, separator, nbr_of_iterations);
+    let mut stream = StreamGenerator::new(CONTENT_LEN, separator, nbr_of_iterations);
 
     let mut buf = vec![0u8; BUF_SIZE];
     let mut nb_sep_found = 0usize;

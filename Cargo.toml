@@ -19,7 +19,7 @@ log = { version = "0.4", optional = true }
 thiserror = "2"
 
 [dev-dependencies]
-divan = "0.1.21"
+sysinfo = "0.39"
 
 [[bench]]
 name = "main"

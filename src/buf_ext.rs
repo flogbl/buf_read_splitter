@@ -8,7 +8,7 @@ pub struct BufExt<'a> {
     ext: Vec<u8>,                      // Bytes in memory
     sz_read_ext: usize,                // Size of the grow for each read
     eos_reached: bool,                 // Indicate that End of stream was reached
-    inner_start: usize, // Virtual start to have a constant speed whatever the size of the buffer is
+    inner_start: usize, // Starting position to have a constant speed whatever the size of the buffer is
 }
 impl<'a> BufExt<'a> {
     ///

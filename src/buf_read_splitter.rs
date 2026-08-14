@@ -113,7 +113,7 @@ impl<'a, T: Matcher> BufReadSplitter<'a, T> {
         }
 
         if self.matched {
-            // Here to manage the remain part to return in the actual buffer
+            // Manage the remain part to return in the actual buffer
             if self.remain == 0 {
                 #[cfg(feature = "log")]
                 log::debug!("Matched but no remain");
@@ -199,24 +199,6 @@ impl<'a, T: Matcher> BufReadSplitter<'a, T> {
             }
         }
     }
-    ///
-    ///
-    /*
-     *
-    fn convert_take_to_pos_sz(
-        take_left: usize,
-        take_right: usize,
-        sz_matched: usize,
-        pos: usize,
-    ) -> (usize, usize) {
-        if take_left + take_right > sz_matched {
-            panic!("Size matched overflow ! take_left={take_left} + take_right={take_left} > sz_matched={sz_matched}")
-        }
-        let sz_returned = sz_matched - take_left - take_right;
-        let pos_returned = pos - take_right;
-        (sz_returned, pos_returned)
-    }
-    */
     ///
     /// Searching for a match in buf and buf_ext
     fn search_match(

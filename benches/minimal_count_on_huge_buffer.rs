@@ -12,7 +12,6 @@ use std::io::Read;
 use crate::common::procinfo::*;
 use crate::common::stream_generator::*;
 
-const BUF_SIZE: usize = 100_000;
 const CONTENT_LEN: usize = 10;
 
 pub fn bench() {

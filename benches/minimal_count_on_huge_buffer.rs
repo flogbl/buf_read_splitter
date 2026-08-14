@@ -16,31 +16,38 @@ const BUF_SIZE: usize = 100_000;
 const CONTENT_LEN: usize = 10;
 
 pub fn bench() {
+    // Report header
+    println!("|{}|", "-".repeat(35));
+    println!(
+        "|  {:>6.3}   |  {:>6.3}   |  {:>6.3}   |",
+        "buf sz", "buf", "min"
+    );
+    println!("|{}|", "-".repeat(35));
+
+    // Init
     let mut proc_info = ProcInfo::new();
 
-    let cpu1_before = proc_info.cpu_time();
-    buf_read_splitter();
-    let cpu1_after = proc_info.cpu_time();
-    let cpu2_before = proc_info.cpu_time();
-    count_minimaliste();
-    let cpu2_after = proc_info.cpu_time();
+    for buf_size in [10, 100, 1_000, 10_000, 100_000, 1_000_000] {
+        let cpu1_before = proc_info.cpu_time();
+        buf_read_splitter(buf_size);
+        let cpu1_after = proc_info.cpu_time();
+        let cpu2_before = proc_info.cpu_time();
+        count_minimaliste(buf_size);
+        let cpu2_after = proc_info.cpu_time();
 
-    // Report
-    println!("|{}|", "-".repeat(23));
-    println!(
-        "|  {:>6.3}   |  {:>6.3}   |",
-        "buf_read_splitter", "minimal_count"
-    );
-    println!("|{}|", "-".repeat(23));
-    println!(
-        "| {:>6.3} ms | {:>6.3} ms |",
-        cpu1_after - cpu1_before,
-        cpu2_after - cpu2_before
-    );
-    println!("|{}|", "-".repeat(23));
+        println!(
+            "| {:>9.3} | {:>6.3} ms | {:>6.3} ms |",
+            buf_size,
+            cpu1_after - cpu1_before,
+            cpu2_after - cpu2_before
+        );
+    }
+
+    // Report footer
+    println!("|{}|", "-".repeat(35));
 }
 
-fn buf_read_splitter() {
+fn buf_read_splitter(buf_size: usize) {
     let nbr_of_iterations = 10_000_000 / CONTENT_LEN;
     let separator = "<SEP>";
     let mut stream = StreamGenerator::new(CONTENT_LEN, separator, nbr_of_iterations);
@@ -51,7 +58,7 @@ fn buf_read_splitter() {
         Options::default(),
     );
 
-    let mut buf = vec![0u8; BUF_SIZE];
+    let mut buf = vec![0u8; buf_size];
 
     let mut nb_part_found = 0usize;
 
@@ -74,12 +81,12 @@ fn buf_read_splitter() {
     )
 }
 
-fn count_minimaliste() {
+fn count_minimaliste(buf_size: usize) {
     let nbr_of_iterations = 10_000_000 / CONTENT_LEN;
     let separator = "<SEP>";
     let mut stream = StreamGenerator::new(CONTENT_LEN, separator, nbr_of_iterations);
 
-    let mut buf = vec![0u8; BUF_SIZE];
+    let mut buf = vec![0u8; buf_size];
     let mut nb_sep_found = 0usize;
 
     let mut pos_found = 0usize;

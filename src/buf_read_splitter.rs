@@ -139,7 +139,21 @@ impl<'a, T: Matcher> BufReadSplitter<'a, T> {
             let mut sz_read = 0;
 
             if self.buf_extend.len() > 0 {
-                sz_read = self.buf_extend.pop_buf_into(buf);
+                //
+                // Pop from the buf_ext, just copy needed part by taking consideration of a split inside this one
+                //
+                let (state, sz_matched, pos) = self.search_match_in_buf_extend(buf.len())?;
+                if let MatchResult::Match(take_left, take_right) = state {
+                    let ps = PosSizeHelper::from_match(take_left, take_right, sz_matched, pos);
+                    sz_read = self.buf_extend.pop_buf_into(&mut buf[..ps.skipped_pos()]);
+                    self.buf_extend.drain(0..ps.skipped_len());
+                    // The next read have to stop the read (return sz_read=0)
+                    self.matched = true;
+                    self.remain = 0;
+                    return Ok(sz_read);
+                } else {
+                    sz_read = self.buf_extend.pop_buf_into(buf);
+                }
             }
             // Feed the remaining part by consumming the input buffer
             //todo: is necessary if there's a match inside it ?
@@ -214,7 +228,7 @@ impl<'a, T: Matcher> BufReadSplitter<'a, T> {
         let mut state = self.search_match_in_buffer(buf, sz_read, &mut sz_matched, &mut pos);
         if matches!(state, MatchResult::NeedNext) {
             // Search in the extended buffer
-            state = self.search_match_in_buf_extend(&mut sz_matched, &mut pos)?;
+            state = self.continue_match_in_buf_extend(&mut sz_matched, &mut pos)?;
         }
 
         match state {
@@ -252,7 +266,7 @@ impl<'a, T: Matcher> BufReadSplitter<'a, T> {
         latest_state
     }
 
-    fn search_match_in_buf_extend(
+    fn continue_match_in_buf_extend(
         &mut self,
         sz_matched: &mut usize,
         pos: &mut usize,
@@ -285,6 +299,47 @@ impl<'a, T: Matcher> BufReadSplitter<'a, T> {
             Ok(state)
         }
     }
+
+    fn search_match_in_buf_extend(
+        &mut self,
+        dest_len: usize,
+    ) -> std::io::Result<(MatchResult, usize, usize)> {
+        let len_origine = self.buf_extend.len().clone();
+        let mut sz_matched = 0usize; //Size matched
+        let mut pos = 0usize; //Absolute position of the latest position that matched
+
+        let it = self.buf_extend.iter_growing();
+        for res in it {
+            let state = self.matcher.sequel(res?, sz_matched);
+            match state {
+                MatchResult::NeedNext => {
+                    sz_matched += 1;
+                }
+                MatchResult::Match(_, _) => {
+                    sz_matched += 1;
+                    return Ok((state, sz_matched, pos));
+                }
+                MatchResult::Mismatch => {
+                    sz_matched = 0;
+                    if pos + 1 == len_origine || pos + 1 == dest_len {
+                        return Ok((state, sz_matched, pos));
+                    }
+                }
+            }
+            pos += 1;
+        }
+        // We are at the end of the stream => we manage the EOS call
+        if false == self.buf_extend.eos_reached() {
+            Ok((MatchResult::Mismatch, sz_matched, pos))
+        } else {
+            let state = self.matcher.sequel_eos(sz_matched - 1);
+            if matches!(state, MatchResult::Match(_, _)) {
+                pos -= 1;
+            }
+            Ok((state, sz_matched, pos))
+        }
+    }
+
     ///
     /// Log read
     #[cfg(feature = "log")]

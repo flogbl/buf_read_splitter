@@ -105,7 +105,8 @@ impl<'a> fmt::Debug for BufExt<'a> {
         write!(
             f,
             "buf_extend={:?} sz_read_ext=[{:?}]",
-            self.ext, self.sz_read_ext
+            String::from_utf8_lossy(self.ext.as_slice()),
+            self.sz_read_ext
         )
     }
 }

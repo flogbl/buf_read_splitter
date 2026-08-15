@@ -1,6 +1,8 @@
 # buf_read_splitter
 
-Allows detecting specific separators when reading a Stream in a buffer. Separators can be determined by a function to be flexible. I initially wrote this library because `read_until` accepts only one char as the separator.
+A stream reader with ability to read a stream until a defined pattern is reached (usually an array of [u8])
+
+I initially wrote this library because `read_until` accepts only one char as the separator.
 Priority is given to low memory and CPU usage (try `cargo bench` for more details)
 
 The separator could be a simple one :

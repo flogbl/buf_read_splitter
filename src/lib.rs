@@ -1,6 +1,9 @@
 //!A stream reader with ability to read a stream until a defined pattern is reached (usually an array of [u8])
 //!
-//!This could be a simple separator :
+//!I initially wrote this library because `read_until` accepts only one char as the separator.
+//!Priority is given to low memory and CPU usage (try `cargo bench` for more details)
+//!
+//!The separator could be a simple one :
 //!```rust
 //!use std::io::Read;
 //!use buf_read_splitter::{BufReadSplitter,MatchResult,Options,SimpleMatcher};
@@ -11,9 +14,9 @@
 //!
 //!// Create a reader that will end at each "<SEP>" :
 //!let mut reader = BufReadSplitter::new(
-//!            &mut input_reader,
-//!            SimpleMatcher::new(b"<SEP>"),
-//!            Options::default(),
+//!           &mut input_reader,
+//!           SimpleMatcher::new(b"<SEP>"),
+//!           Options::default(),
 //!);
 //!
 //!// List of separate String will be listed in a Vector :
@@ -24,19 +27,19 @@
 //!let mut buf = vec![0u8; 100];
 //!
 //!while {
-//!  let sz = reader.read(&mut buf).unwrap();
-//!  if sz > 0 {
-//!     let to_str = String::from_utf8_lossy(&buf[..sz]);
-//!     word.push_str(&to_str);
-//!     true
-//!  } else {
-//!     words.push(word.clone());
-//!     word.clear();
-//!     match reader.next_part().unwrap() {  //Pass to the next part of the buffer
-//!        Some(_) => true,     //There's a next part
-//!        None => false,       //End of the stream
-//!     }
-//!  }
+//! let sz = reader.read(&mut buf).unwrap();
+//! if sz > 0 {
+//!    let to_str = String::from_utf8_lossy(&buf[..sz]);
+//!    word.push_str(&to_str);
+//!    true
+//! } else {
+//!    words.push(word.clone());
+//!    word.clear();
+//!    match reader.next_part().unwrap() {  //Pass to the next part of the buffer
+//!       Some(_) => true,     //There's a next part
+//!       None => false,       //End of the stream
+//!    }
+//! }
 //!} {}
 //!
 //!assert_eq!(&words[0], "First");
@@ -47,68 +50,68 @@
 //!assert_eq!(words.len(), 5);
 //!```
 //!\
-//!For more complexe pattern, the trait `Matcher` has to be implementing.\
-//!For example above a Matcher able to split a stream at each Mac, Unix or Windows end of line :
+//!And to manage more complexe pattern, the trait `Matcher` has to be implemented.\
+//!For example above a Matcher able to split a stream at each Mac, Unix or Windows end of line (note the use of the position in the separator determination function) :
 //!```rust
 //!use buf_read_splitter::{
-//!        MatchResult,
-//!        Matcher,
-//!        };
+//!       MatchResult,
+//!       Matcher,
+//!       };
 //!
 //!struct AllEndOfLineMatcher {
-//!    prev_char: u8,
+//!   prev_char: u8,
 //!}
 //!impl AllEndOfLineMatcher {
-//!    pub fn new() -> Self {
-//!        Self { prev_char: 0 }
-//!    }
+//!   pub fn new() -> Self {
+//!       Self { prev_char: 0 }
+//!   }
 //!}
 //!impl Matcher for AllEndOfLineMatcher {
-//!    // This function is called at each byte read
-//!    //   `el_buf` contains the value of the byte
-//!    //   `pos` contains the position matched
-//!    fn sequel(&mut self, el_buf: u8, pos: usize) -> MatchResult {
-//!        if pos == 0 {
-//!            if el_buf == b'\r' || el_buf == b'\n' {
-//!                self.prev_char = el_buf;
-//!                MatchResult::NeedNext
-//!            } else {
-//!                MatchResult::Mismatch
-//!            }
-//!        } else if pos == 1 {
-//!            if el_buf == b'\n' && self.prev_char == b'\r' {
-//!                //We are on \r\n
-//!                MatchResult::Match(0, 0)
-//!            } else {
-//!                //Ignore the last byte (it's not a part of the end of line)
-//!                MatchResult::Match(0, 1)
-//!            }
-//!        } else {
-//!            //Unreachable
-//!            panic!("We can't reach this code since we just manage 2 positions")
-//!        }
-//!    }
+//!   // This function is called at each byte read
+//!   //   `el_buf` contains the value of the byte
+//!   //   `pos` contains the position matched
+//!   fn sequel(&mut self, el_buf: u8, pos: usize) -> MatchResult {
+//!       if pos == 0 {
+//!           if el_buf == b'\r' || el_buf == b'\n' {
+//!               self.prev_char = el_buf;
+//!               MatchResult::NeedNext
+//!           } else {
+//!               MatchResult::Mismatch
+//!           }
+//!       } else if pos == 1 {
+//!           if el_buf == b'\n' && self.prev_char == b'\r' {
+//!               //We are on \r\n
+//!               MatchResult::Match(0, 0)
+//!           } else {
+//!               //Ignore the last byte (it's not a part of the end of line)
+//!               MatchResult::Match(0, 1)
+//!           }
+//!       } else {
+//!           //Unreachable
+//!           panic!("We can't reach this code since we just manage 2 positions")
+//!       }
+//!   }
 //!
-//!    // This function is called at the end of the buffer, useful to manage partial cases
-//!    fn sequel_eos(&mut self, pos: usize) -> MatchResult {
-//!        if pos == 0 {
-//!            MatchResult::Match(0, 0) //Here the last char is \r or \n, at position 0
-//!        } else {
-//!            panic!("We can't reach this code since we just manage 2 positions")
-//!        }
-//!    }
+//!   // This function is called at the end of the buffer, useful to manage partial cases
+//!   fn sequel_eos(&mut self, pos: usize) -> MatchResult {
+//!       if pos == 0 {
+//!           MatchResult::Match(0, 0) //Here the last char is \r or \n, at position 0
+//!       } else {
+//!           panic!("We can't reach this code since we just manage 2 positions")
+//!       }
+//!   }
 //!}
 //!```
-//!...so the reader can be created like with this code :
+//!...so the reader can be created with this code :
 //!```ignore
-//! let mut reader = BufReadSplitter::new(
-//!                             &mut input_reader,
-//!                             AllEndOfLineMatcher::new(),
-//!                             Options::default()
-//!                             );
+//!let mut reader = BufReadSplitter::new(
+//!                            &mut input_reader,
+//!                            AllEndOfLineMatcher::new(),
+//!                            Options::default()
+//!                            );
 //!```
 //!\
-//!The separator pattern can be changed on the fly by calling "`matcher`" function :
+//!The separator pattern can be changed on the fly by calling the "`matcher`" function :
 //!```ignore
 //!reader.matcher(SimpleMatcher::new(b"<CHANGE SEP>"))
 //!```
@@ -124,15 +127,17 @@
 //!```
 //!
 //!\
-//!A call to "`.next_part()`" pass to the next part, however the end was reached or not (skips what has not been readed)\
+//!A call to "`.next_part()`" pass to the next part, skipping until the next part if the end was not reached
 //!
 //!\
-//!For debug purpose, you can activate the "log" features in the Cargo.toml (slow down processing) :
+//!For debug purpose, you can activate the "log" features in the Cargo.toml (note that it slows down the processing) :
 //!```ignore
 //![dependencies]
 //!buf_read_splitter = {"0.4", features = ["log"] }
 //!```
 //!
+//!
+//!License: MIT
 
 mod all_end_of_line_matcher;
 pub use all_end_of_line_matcher::AllEndOfLineMatcher;

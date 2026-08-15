@@ -1,5 +1,5 @@
-use crate::match_result::MatchResult;
-use crate::matcher::Matcher;
+use crate::MatchResult;
+use crate::Matcher;
 
 pub struct AllEndOfLineMatcher {
     prev_char: u8,

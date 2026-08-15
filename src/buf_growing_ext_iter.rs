@@ -1,10 +1,10 @@
-use crate::buf_ext::BufExt;
+use crate::BufExt;
 
-pub struct BufExtIter<'a, 'b> {
+pub struct BufGrowingExtIter<'a, 'b> {
     buf_ext: &'a mut BufExt<'b>,
     next_pos: usize,
 }
-impl<'a, 'b> BufExtIter<'a, 'b> {
+impl<'a, 'b> BufGrowingExtIter<'a, 'b> {
     pub fn new(buf_ext: &'a mut BufExt<'b>) -> Self {
         Self {
             buf_ext,
@@ -12,7 +12,7 @@ impl<'a, 'b> BufExtIter<'a, 'b> {
         }
     }
 }
-impl<'a, 'b> Iterator for BufExtIter<'a, 'b> {
+impl<'a, 'b> Iterator for BufGrowingExtIter<'a, 'b> {
     type Item = std::io::Result<u8>;
 
     fn next(&mut self) -> Option<Self::Item> {

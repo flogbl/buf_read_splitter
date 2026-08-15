@@ -1,11 +1,8 @@
 #[cfg(test)]
-mod tests {
+mod unit_tests {
     use std::io::Read;
 
-    use buf_read_splitter::{
-        buf_read_splitter::BufReadSplitter, match_result::MatchResult, matcher::Matcher,
-        options::Options, simple_matcher::SimpleMatcher,
-    };
+    use buf_read_splitter::{BufReadSplitter, MatchResult, Matcher, Options, SimpleMatcher};
 
     #[test]
     fn test_none_to_match() {
@@ -520,7 +517,6 @@ mod tests {
                 Ok(sz) => {
                     #[cfg(feature = "log")]
                     log::debug!("sz={sz}");
-
                     if sz == 0 {
                         text.push('.');
                         match reader.next_part() {

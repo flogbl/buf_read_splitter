@@ -1,18 +1,41 @@
 [package]
 name = "buf_read_splitter"
-version = "0.3.0"
+version = "0.4.1"
 edition = "2021"
-description = "Stream reader with capacity to split(stop) on a defined pattern (usually &[u8] but can also more complex pattern)"
+description = "A stream reader with ability to read a stream until a defined pattern is reached (usually an array of [u8])"
 repository = "https://github.com/flogbl/buf_read_splitter"
 license = "MIT"
 exclude = [".gitignore"]
-
-[dependencies]
-env_logger = { version = "0.7", optional = true }
-log = { version = "0.4", optional = true }
-format_hex = { version = "0.1", optional = true }
 
 [features]
 default = []
 #default = ["log"]
 log = ["dep:log", "dep:format_hex", "dep:env_logger"]
+
+[dependencies]
+env_logger = { version = "0.7", optional = true }
+format_hex = { version = "0.1", optional = true }
+log = { version = "0.4", optional = true }
+thiserror = "2"
+
+[dev-dependencies]
+sysinfo = "0.39"
+
+[[bench]]
+name = "main"
+harness = false
+
+# To use flamegraph
+# Command example : cargo flamegraph --test count_on_huge_buffer
+#[profile.release]
+#debug = true
+#strip = false
+
+# for speed
+[profile.release]
+opt-level = 3          # Niveau d'optimisation maximal (0-3)
+lto = "fat"            # Link-Time Optimization (améliore les performances)
+codegen-units = 1      # Moins d'unités de génération de code = meilleures optimisations (mais compilation plus lente)
+panic = "abort"        # Désactive les messages de panique pour réduire la taille
+strip = true           # Supprime les symboles de débogage (réduit la taille du binaire)
+#target-cpu = "native"  # Optimise pour le CPU de la machine hôte

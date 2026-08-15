@@ -1,13 +1,14 @@
 use core::fmt;
 use std::{cmp, ops::Range};
 
-use crate::buf_ext_iter::BufExtIter;
+use crate::BufGrowingExtIter;
 
 pub struct BufExt<'a> {
     reader: &'a mut dyn std::io::Read, // The stream to read
     ext: Vec<u8>,                      // Bytes in memory
     sz_read_ext: usize,                // Size of the grow for each read
     eos_reached: bool,                 // Indicate that End of stream was reached
+    inner_start: usize, // Starting position to have a constant speed whatever the size of the buffer is
 }
 impl<'a> BufExt<'a> {
     ///
@@ -22,11 +23,16 @@ impl<'a> BufExt<'a> {
             ext: Vec::with_capacity(initiale_capacity),
             sz_read_ext,
             eos_reached: false,
+            inner_start: 0,
         }
     }
     ///
     /// Extend the internal buffer by reading the input buffer
     pub fn extend(&mut self) -> std::io::Result<usize> {
+        // We have to reduce the inner buffer to avoid a buffer that can grow infinitly
+        self.ext.drain(..self.inner_start);
+        self.inner_start = 0;
+
         // Extends if needed
         if self.ext.capacity() < self.ext.len() + self.sz_read_ext {
             self.ext.reserve(self.sz_read_ext);
@@ -52,15 +58,21 @@ impl<'a> BufExt<'a> {
     ///
     /// Unstack the buffer extender
     pub fn pop_buf_into(&mut self, buf: &mut [u8]) -> usize {
-        let sz = cmp::min(self.ext.len(), buf.len());
-        buf[..sz].copy_from_slice(&self.ext[..sz]);
-        self.ext.drain(..sz);
+        let sz = cmp::min(self.len(), buf.len());
+        buf[..sz].copy_from_slice(&self.ext[self.inner_start..self.inner_start + sz]);
+        self.inner_start += sz;
         sz
     }
     ///
     /// Remove a certain number of elements at the begin of the extend buffer
     pub fn drain(&mut self, range: Range<usize>) {
-        self.ext.drain(range);
+        if range.start == 0 {
+            self.inner_start += range.end;
+        } else {
+            let new_start = range.start + self.inner_start;
+            let new_end = range.end + self.inner_start;
+            self.ext.drain(new_start..new_end);
+        }
     }
     ///
     /// Read the input buffer
@@ -70,17 +82,30 @@ impl<'a> BufExt<'a> {
     ///
     ///
     pub fn push_at_begin(&mut self, buf: &[u8]) {
-        self.ext.splice(0..0, buf.iter().copied());
+        self.ext.drain(..self.inner_start);
+        self.inner_start = 0;
+
+        if buf.len() <= self.inner_start {
+            self.inner_start -= buf.len();
+            self.ext[self.inner_start..self.inner_start + buf.len()].copy_from_slice(buf);
+        } else {
+            self.ext[0..self.inner_start].copy_from_slice(&buf[0..self.inner_start]);
+            self.ext.splice(
+                self.inner_start..self.inner_start,
+                buf[self.inner_start..].iter().copied(),
+            );
+            self.inner_start = 0;
+        }
     }
     ///
     /// Actual length of the internal buffer
     pub fn len(&self) -> usize {
-        self.ext.len()
+        self.ext.len() - self.inner_start
     }
     ///
     /// Get a value
     pub fn at(&self, pos: usize) -> u8 {
-        self.ext[pos]
+        self.ext[pos + self.inner_start]
     }
     ///
     /// Indicate if End Of Stream is reached or not
@@ -89,12 +114,12 @@ impl<'a> BufExt<'a> {
     }
     ///
     /// To iterate
-    pub fn iter_growing<'b>(&'b mut self) -> BufExtIter<'b, 'a> {
-        BufExtIter::new(self)
+    pub fn iter_growing<'b>(&'b mut self) -> BufGrowingExtIter<'b, 'a> {
+        BufGrowingExtIter::new(self)
     }
     #[allow(dead_code)]
     pub fn cloned_internal_vec(&self) -> Vec<u8> {
-        self.ext.clone()
+        self.ext[self.inner_start..].to_vec()
     }
 }
 
@@ -105,7 +130,8 @@ impl<'a> fmt::Debug for BufExt<'a> {
         write!(
             f,
             "buf_extend={:?} sz_read_ext=[{:?}]",
-            self.ext, self.sz_read_ext
+            String::from_utf8_lossy(self.ext.as_slice()),
+            self.sz_read_ext
         )
     }
 }

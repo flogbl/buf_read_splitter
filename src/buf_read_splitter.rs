@@ -1,12 +1,12 @@
 use core::fmt;
 use std::{cmp, io::Read};
 
-use crate::buf_ext::BufExt;
-use crate::match_result::MatchResult;
-use crate::matcher::Matcher;
-use crate::options::Options;
-
-type Result<T> = std::result::Result<T, Box<dyn std::error::Error>>;
+use crate::errors::*;
+use crate::BufExt;
+use crate::MatchResult;
+use crate::Matcher;
+use crate::Options;
+use crate::PosSizeHelper;
 
 ///
 /// BufReadSplitter : See unit test or lib documentations for an example
@@ -16,7 +16,7 @@ pub struct BufReadSplitter<'a, T: Matcher> {
     buf_extend: BufExt<'a>, // Extend buffer, need to detecte the matched part overflowing the output buffer
     options: Options,       // Options stores here
     matched: bool,          // Indicate that the pattern is matched
-    curr_limit_read: Option<usize>, // Counter of the limit to read
+    curr_limit_read: Option<usize>, // Counter for the size limit to read
     remain: usize,
     #[cfg(feature = "log")]
     log_call_read: usize,
@@ -73,7 +73,7 @@ impl<'a, T: Matcher> BufReadSplitter<'a, T> {
             #[cfg(feature = "log")]
             log::debug!("Set matched to FALSE");
 
-            self.matched = false; // We are now on the next buffer, nothing even read, nothing even matched
+            self.matched = false; // We are now at the next buffer, nothing even read, nothing even matched
             self.curr_limit_read = self.options.limit_read;
             Ok(Some(())) // It had just been stopping because it reached the separator
         }
@@ -113,7 +113,7 @@ impl<'a, T: Matcher> BufReadSplitter<'a, T> {
         }
 
         if self.matched {
-            // Here to manage the remain part to return in the actual buffer
+            // Manage the remain part to return in the actual buffer
             if self.remain == 0 {
                 #[cfg(feature = "log")]
                 log::debug!("Matched but no remain");
@@ -132,58 +132,59 @@ impl<'a, T: Matcher> BufReadSplitter<'a, T> {
                     &self.buf_extend.cloned_internal_vec(),
                     "",
                 );
-
                 Ok(sz)
             }
         } else {
             // Initialize the size to return
             let mut sz_read = 0;
 
-            // First, feed the output buffer consuming datas of the previous read
             if self.buf_extend.len() > 0 {
-                sz_read = self.buf_extend.pop_buf_into(buf);
+                //
+                // Pop from the buf_ext, just copy needed part by taking consideration of a split inside this one
+                //
+                let (state, sz_matched, pos) = self.search_match_in_buf_extend(buf.len())?;
+                if let MatchResult::Match(take_left, take_right) = state {
+                    let ps = PosSizeHelper::from_match(take_left, take_right, sz_matched, pos);
+                    sz_read = self.buf_extend.pop_buf_into(&mut buf[..ps.skipped_pos()]);
+                    self.buf_extend.drain(0..ps.skipped_len());
+                    // The next read have to stop the read (return sz_read=0)
+                    self.matched = true;
+                    self.remain = 0;
+                    return Ok(sz_read);
+                } else {
+                    sz_read = self.buf_extend.pop_buf_into(buf);
+                }
             }
             // Feed the remaining part by consumming the input buffer
+            //todo: is necessary if there's a match inside it ?
             if sz_read < buf.len() {
                 sz_read += self.buf_extend.read_direct(&mut buf[sz_read..])?;
             }
 
             match self.search_match(buf, sz_read)? {
-                Some((sz_matched, pos)) => {
-                    // Calculate absolute position (in buf+buf_ext) and relative positions (in buf_ext)
-                    let abs_end = pos + 1;
-                    let abs_start = abs_end - sz_matched;
-                    let rel_end = {
-                        if abs_end > buf.len() {
-                            abs_end - buf.len()
-                        } else {
-                            0
-                        }
-                    };
-                    let rel_start = {
-                        if rel_end > sz_matched {
-                            rel_end - sz_matched
-                        } else {
-                            0
-                        }
-                    };
+                Some(ps_absolute) => {
+                    let ps_bufext = PosSizeHelper::from_relative(&ps_absolute, buf.len());
 
                     // Save the part next to the matched part if there's one
-                    if abs_end < buf.len() {
-                        self.buf_extend.push_at_begin(&buf[abs_end..sz_read]);
+                    // (we have to push at the begin because the buffer can already contains datas)
+                    //todo: is there a simpler way ?
+                    if ps_absolute.next_content_pos() < buf.len() {
+                        self.buf_extend
+                            .push_at_begin(&buf[ps_absolute.next_content_pos()..sz_read]);
                     }
 
-                    // If a part of the buf_extend must not be returned, we remove it
-                    if rel_end > 0 {
-                        self.buf_extend.drain(rel_start..rel_end); //.pop_buf(pos - buf.len() + 1);
+                    // If a part of the buf_extend have not to be returned, we remove it
+                    if ps_bufext.next_content_pos() > 0 {
+                        self.buf_extend
+                            .drain(ps_bufext.skipped_pos()..ps_bufext.next_content_pos());
                     }
 
-                    // If there's something next to return in the extend buf
-                    if abs_start > buf.len() {
-                        self.remain = rel_start;
+                    // If there's something next to return in the buf_extend
+                    if ps_absolute.skipped_pos() > buf.len() {
+                        self.remain = ps_bufext.skipped_pos();
                     }
 
-                    let sz_to_return = cmp::min(buf.len(), abs_start);
+                    let sz_to_return = cmp::min(buf.len(), ps_absolute.skipped_pos());
 
                     // Debug
                     #[cfg(feature = "log")]
@@ -216,74 +217,129 @@ impl<'a, T: Matcher> BufReadSplitter<'a, T> {
     /// Searching for a match in buf and buf_ext
     fn search_match(
         &mut self,
-        buf: &mut [u8],
+        buf: &[u8],
         sz_read: usize,
-    ) -> std::io::Result<Option<(usize, usize)>> {
-        let mut sz_matched = 0; //Size matched
+    ) -> std::io::Result<Option<PosSizeHelper>> {
+        // Initialize
+        let mut sz_matched = 0usize; //Size matched
         let mut pos = 0usize; //Absolute position of the last position that matched
 
-        // For factorisation of the common part in the two loops
-        let fn_calc_returned = |take_left: usize,
-                                take_right: usize,
-                                sz_matched: usize,
-                                pos: usize| {
-            if take_left + take_right > sz_matched {
-                panic!("Size matched overflow ! take_left={take_left} + take_right={take_left} > sz_matched={sz_matched}")
-            }
-            let sz_returned = sz_matched - take_left - take_right;
-            let pos_returned = pos - take_right;
-            (sz_returned, pos_returned)
-        };
-
-        // Search in buf
-        for el in buf[..sz_read].into_iter() {
-            match self.matcher.sequel(*el, sz_matched) {
-                MatchResult::NeedNext => sz_matched += 1,
-                MatchResult::Match(take_left, take_right) => {
-                    sz_matched += 1;
-                    let res = fn_calc_returned(take_left, take_right, sz_matched, pos);
-                    return Ok(Some(res));
-                }
-                MatchResult::Mismatch => sz_matched = 0,
-            }
-            pos += 1;
+        // Search in the buffer
+        let mut state = self.search_match_in_buffer(buf, sz_read, &mut sz_matched, &mut pos);
+        if matches!(state, MatchResult::NeedNext) {
+            // Search in the extended buffer
+            state = self.continue_match_in_buf_extend(&mut sz_matched, &mut pos)?;
         }
 
-        if sz_matched == 0 {
-            Ok(None)
-        } else
-        // Continue to search in buf_ext if needed
-        {
-            let it = self.buf_extend.iter_growing();
-            for res in it {
-                let el = res?;
-                match self.matcher.sequel(el, sz_matched) {
-                    MatchResult::NeedNext => {
-                        sz_matched += 1;
-                    }
-                    MatchResult::Match(take_left, take_right) => {
-                        sz_matched += 1;
-                        let res = fn_calc_returned(take_left, take_right, sz_matched, pos);
-                        return Ok(Some(res));
-                    }
-                    MatchResult::Mismatch => return Ok(None),
-                }
-                pos += 1;
+        match state {
+            MatchResult::Mismatch => Ok(None),
+            MatchResult::Match(take_left, take_right) => {
+                let pos_sz = PosSizeHelper::from_match(take_left, take_right, sz_matched, pos);
+                Ok(Some(pos_sz))
             }
-            // We arrived here because in NeedNext state, so we have to manage the EOS call
-            if false == self.buf_extend.eos_reached() {
-                Ok(None)
-            } else {
-                match self.matcher.sequel_eos(sz_matched - 1) {
-                    MatchResult::Match(take_left, take_right) => {
-                        let res = fn_calc_returned(take_left, take_right, sz_matched, pos - 1);
-                        Ok(Some(res))
-                    }
-                    _ => Ok(None),
-                }
+            MatchResult::NeedNext => {
+                panic!("Abnormal case: normally there's no stop until end is reached")
             }
         }
     }
+
+    fn search_match_in_buffer(
+        &mut self,
+        buf: &[u8],
+        sz_read: usize,
+        sz_matched: &mut usize,
+        pos: &mut usize,
+    ) -> MatchResult {
+        let mut latest_state = MatchResult::Mismatch;
+        for el in buf[..sz_read].into_iter() {
+            latest_state = self.matcher.sequel(*el, *sz_matched);
+            match latest_state {
+                MatchResult::NeedNext => *sz_matched += 1,
+                MatchResult::Match(_, _) => {
+                    *sz_matched += 1;
+                    return latest_state;
+                }
+                MatchResult::Mismatch => *sz_matched = 0,
+            }
+            *pos += 1;
+        }
+        latest_state
+    }
+
+    fn continue_match_in_buf_extend(
+        &mut self,
+        sz_matched: &mut usize,
+        pos: &mut usize,
+    ) -> std::io::Result<MatchResult> {
+        // We are here because the begin of the potentiel pattern has been found in the buffer part, so we have
+        // to determine if it is really matched or not to stop the buffer.
+        let it = self.buf_extend.iter_growing();
+        for res in it {
+            let state = self.matcher.sequel(res?, *sz_matched);
+            match state {
+                MatchResult::NeedNext => {
+                    *sz_matched += 1;
+                }
+                MatchResult::Match(_, _) => {
+                    *sz_matched += 1;
+                    return Ok(state);
+                }
+                MatchResult::Mismatch => return Ok(state),
+            }
+            *pos += 1;
+        }
+        // We are at the end of the stream => we manage the EOS call
+        if false == self.buf_extend.eos_reached() {
+            Ok(MatchResult::Mismatch)
+        } else {
+            let state = self.matcher.sequel_eos(*sz_matched - 1);
+            if matches!(state, MatchResult::Match(_, _)) {
+                *pos -= 1;
+            }
+            Ok(state)
+        }
+    }
+
+    fn search_match_in_buf_extend(
+        &mut self,
+        dest_len: usize,
+    ) -> std::io::Result<(MatchResult, usize, usize)> {
+        let len_origine = self.buf_extend.len().clone();
+        let mut sz_matched = 0usize; //Size matched
+        let mut pos = 0usize; //Absolute position of the latest position that matched
+
+        let it = self.buf_extend.iter_growing();
+        for res in it {
+            let state = self.matcher.sequel(res?, sz_matched);
+            match state {
+                MatchResult::NeedNext => {
+                    sz_matched += 1;
+                }
+                MatchResult::Match(_, _) => {
+                    sz_matched += 1;
+                    return Ok((state, sz_matched, pos));
+                }
+                MatchResult::Mismatch => {
+                    sz_matched = 0;
+                    if pos + 1 == len_origine || pos + 1 == dest_len {
+                        return Ok((state, sz_matched, pos));
+                    }
+                }
+            }
+            pos += 1;
+        }
+        // We are at the end of the stream => we manage the EOS call
+        if false == self.buf_extend.eos_reached() {
+            Ok((MatchResult::Mismatch, sz_matched, pos))
+        } else {
+            let state = self.matcher.sequel_eos(sz_matched - 1);
+            if matches!(state, MatchResult::Match(_, _)) {
+                pos -= 1;
+            }
+            Ok((state, sz_matched, pos))
+        }
+    }
+
     ///
     /// Log read
     #[cfg(feature = "log")]

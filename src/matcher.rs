@@ -1,4 +1,4 @@
-use crate::match_result::MatchResult;
+use crate::MatchResult;
 
 pub trait Matcher {
     ///

@@ -52,8 +52,8 @@ assert_eq!(&words[4], "Fifth");
 assert_eq!(words.len(), 5);
 ```
 \
-For more complexe pattern, the trait `Matcher` has to be implemented.\
-In the example above a Matcher able to split a stream at each Mac, Unix or Windows end of line (note the use of the position in the separator determination function) :
+And to manage more complexe pattern, the trait `Matcher` has to be implemented.\
+For example above a Matcher able to split a stream at each Mac, Unix or Windows end of line (note the use of the position in the separator determination function) :
 ```rust
 use buf_read_splitter::{
        MatchResult,

@@ -127,7 +127,7 @@ reader.set_limit_read(None);
 ```
 
 \
-A call to "`.next_part()`" pass to the next part, however the end was reached or not (skips what has not been readed)\
+A call to "`.next_part()`" pass to the next part, skipping until the next part if the end was not reached
 
 \
 For debug purpose, you can activate the "log" features in the Cargo.toml (note that it slows down the processing) :

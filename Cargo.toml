@@ -1,6 +1,6 @@
 [package]
 name = "buf_read_splitter"
-version = "0.4.1"
+version = "0.4.2"
 edition = "2021"
 description = "A stream buffer reader with ability to split the stream until a defined pattern is reached (usually an array of [u8])"
 repository = "https://github.com/flogbl/buf_read_splitter"
@@ -33,9 +33,5 @@ harness = false
 
 # for speed
 [profile.release]
-opt-level = 3          # Niveau d'optimisation maximal (0-3)
-lto = "fat"            # Link-Time Optimization (améliore les performances)
-codegen-units = 1      # Moins d'unités de génération de code = meilleures optimisations (mais compilation plus lente)
-panic = "abort"        # Désactive les messages de panique pour réduire la taille
-strip = true           # Supprime les symboles de débogage (réduit la taille du binaire)
-#target-cpu = "native"  # Optimise pour le CPU de la machine hôte
+opt-level = 3
+lto = "fat"

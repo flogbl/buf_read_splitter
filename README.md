@@ -102,7 +102,7 @@ impl Matcher for AllEndOfLineMatcher {
    }
 }
 ```
-...so the reader can be created like with this code :
+...so the reader can be created with this code :
 ```rust
 let mut reader = BufReadSplitter::new(
                             &mut input_reader,

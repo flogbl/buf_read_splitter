@@ -17,10 +17,7 @@ const CONTENT_LEN: usize = 10;
 pub fn bench() {
     // Report header
     println!("|{}|", "-".repeat(35));
-    println!(
-        "|  {:>6.3}   |  {:>6.3}   |  {:>6.3}   |",
-        "buf sz", "buf", "min"
-    );
+    println!("|  {:>6}   |  {:>6}   |  {:>6}   |", "sz", "buf", "min");
     println!("|{}|", "-".repeat(35));
 
     // Init

@@ -1,10 +1,12 @@
 # buf_read_splitter
 
+## Presentation
 A stream reader with ability to read a stream until a defined pattern is reached (usually an array of [u8])
 
 I initially wrote this library because `read_until` accepts only one char as the separator.
 Priority is given to low memory and CPU usage (try `cargo bench` for more details)
 
+## By example
 The separator could be a simple one :
 ```rust
 use std::io::Read;
@@ -52,6 +54,8 @@ assert_eq!(&words[4], "Fifth");
 assert_eq!(words.len(), 5);
 ```
 \
+
+## Complex separator predicate
 And to manage more complexe pattern, the trait `Matcher` has to be implemented.\
 For example above a Matcher able to split a stream at each Mac, Unix or Windows end of line (note the use of the position in the separator determination function) :
 ```rust
@@ -118,7 +122,10 @@ The separator pattern can be changed on the fly by calling the "`matcher`" funct
 reader.matcher(SimpleMatcher::new(b"<CHANGE SEP>"))
 ```
 \
-The buffer part can be limited in size readed.\
+
+## Options
+### Limit size of a stream part
+The stream part can be limited in size readed.\
 For example to limit to 100 bytes :
 ```rust
 reader.set_limit_read(Some(100));
@@ -129,14 +136,19 @@ reader.set_limit_read(None);
 ```
 
 \
+### Skip part
 A call to "`.next_part()`" pass to the next part, skipping until the next part if the end was not reached
 
 \
+### Debug buffer content
 For debug purpose, you can activate the "log" features in the Cargo.toml (note that it slows down the processing) :
 ```rust
 [dependencies]
 buf_read_splitter = {"0.4", features = ["log"] }
 ```
 
-
+### License
 License: MIT
+
+### Versions
+[Semver](https://semver.org/) usage.

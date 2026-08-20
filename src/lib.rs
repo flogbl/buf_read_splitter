@@ -105,6 +105,14 @@
 //!The buffer part can be limited in size readed.\
 //!For example to limit to 100 bytes :
 //!```ignore
+//!let mut reader = BufReadSplitter::new(
+//!    &mut input_reader,
+//!    AllEndOfLineMatcher,
+//!    Options::default.set_limit_read(100), //Avoid memory overload
+//!);
+//!```
+//!or on the fly :
+//!```ignore
 //!reader.set_limit_read(Some(100));
 //!```
 //!...and to reinitialize it to "no limit" :
@@ -119,8 +127,8 @@
 //!buf_read_splitter = {"0.4", features = ["log"] }
 //!```
 //!
-//!
 //!License: MIT
+//!
 
 mod all_end_of_line_matcher;
 pub use all_end_of_line_matcher::AllEndOfLineMatcher;

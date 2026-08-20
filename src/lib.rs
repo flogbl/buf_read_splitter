@@ -3,7 +3,7 @@
 //!I initially wrote this library because `read_until` accepts only one char as the separator.
 //!Priority is given to low memory and CPU usage (try `cargo bench` for more details)
 //!
-//!Demonstation by an exemple, where stream is split by "<SEP>", each content is loaded the list `contents`
+//!Demonstation by an exemple, where stream is split by `<SEP>`, each content is loaded the list `contents`
 //!```rust
 //!use std::io::Read;
 //!use buf_read_splitter::{BufReadSplitter,MatchResult,Options,SimpleMatcher};

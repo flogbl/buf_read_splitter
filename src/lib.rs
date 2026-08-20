@@ -97,7 +97,7 @@
 //!                            );
 //!```
 //!\
-//!The separator pattern can be changed on the fly by calling the "`matcher`" function :
+//!The separator pattern can be changed on the fly by calling the `matcher` function :
 //!```ignore
 //!reader.matcher(SimpleMatcher::new(b"<CHANGE SEP>"))
 //!```

@@ -111,7 +111,7 @@
 //!    Options::default.set_limit_read(100), //Avoid memory overload
 //!);
 //!```
-//!or on the fly :
+//!...or on the fly :
 //!```ignore
 //!reader.set_limit_read(Some(100));
 //!```

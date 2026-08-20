@@ -3,44 +3,30 @@
 //!I initially wrote this library because `read_until` accepts only one char as the separator.
 //!Priority is given to low memory and CPU usage (try `cargo bench` for more details)
 //!
-//!The separator could be a simple one :
+//!Demonstation by an exemple, where stream is split by "<SEP>", each content is loaded the list `contents`
 //!```rust
 //!use std::io::Read;
 //!use buf_read_splitter::{BufReadSplitter,MatchResult,Options,SimpleMatcher};
 //!
-//!// To simulate a stream of this content :
+//!// To simulate a stream
 //!let input = "First<SEP>Second<SEP>Third<SEP>Fourth<SEP>Fifth".to_string();
 //!let mut input_reader = input.as_bytes();
 //!
-//!// Create a reader that will end at each "<SEP>" :
+//!// Create a reader that will be separated by "<SEP>"
 //!let mut reader = BufReadSplitter::new(
-//!           &mut input_reader,
-//!           SimpleMatcher::new(b"<SEP>"),
-//!           Options::default(),
+//!    &mut input_reader,
+//!    SimpleMatcher::new(b"<SEP>"),
+//!    Options::default(),
 //!);
 //!
-//!// List of separate String will be listed in a Vector :
-//!let mut words = Vec::new();
+//!let mut contents = Vec::new();
 //!
-//!// Working variables :
-//!let mut word = String::new();
-//!let mut buf = vec![0u8; 100];
-//!
-//!while {
-//! let sz = reader.read(&mut buf).unwrap();
-//! if sz > 0 {
-//!    let to_str = String::from_utf8_lossy(&buf[..sz]);
-//!    word.push_str(&to_str);
-//!    true
-//! } else {
-//!    words.push(word.clone());
-//!    word.clear();
-//!    match reader.next_part().unwrap() {  //Pass to the next part of the buffer
-//!       Some(_) => true,     //There's a next part
-//!       None => false,       //End of the stream
-//!    }
-//! }
-//!} {}
+//!while reader.next().unwrap() {
+//!    let mut buf = Vec::new();
+//!    let _ = reader.read_to_end(&mut buf);
+//!    let str = String::from_utf8(buf).unwrap();
+//!    contents.push(str);
+//!}
 //!
 //!assert_eq!(&words[0], "First");
 //!assert_eq!(&words[1], "Second");

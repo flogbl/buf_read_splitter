@@ -1,5 +1,5 @@
 #[cfg(test)]
-mod unit_tests {
+mod tests_using_next_part {
     use std::io::Read;
 
     use buf_read_splitter::{BufReadSplitter, MatchResult, Matcher, Options, SimpleMatcher};

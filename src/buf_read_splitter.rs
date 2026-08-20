@@ -12,10 +12,11 @@ use crate::PosSizeHelper;
 /// BufReadSplitter : See unit test or lib documentations for an example
 pub struct BufReadSplitter<'a, T: Matcher> {
     //reader: &'a mut dyn std::io::Read, // Buffer reader
-    matcher: T,                     // The Matcher
+    matcher: T,             // The Matcher
     buf_extend: BufExt<'a>, // Extend buffer, need to detecte the matched part overflowing the output buffer
     options: Options,       // Options stores here
     matched: bool,          // Indicate that the pattern is matched
+    first_read: bool,
     curr_limit_read: Option<usize>, // Counter for the size limit to read
     remain: usize,
     #[cfg(feature = "log")]
@@ -36,6 +37,7 @@ impl<'a, T: Matcher> BufReadSplitter<'a, T> {
             buf_extend: BufExt::new(reader, options.initiale_sz_to_match, options.chunk_sz),
             options,
             matched: false,
+            first_read: true,
             curr_limit_read: max_read,
             remain: 0,
             #[cfg(feature = "log")]
@@ -76,6 +78,19 @@ impl<'a, T: Matcher> BufReadSplitter<'a, T> {
             self.matched = false; // We are now at the next buffer, nothing even read, nothing even matched
             self.curr_limit_read = self.options.limit_read;
             Ok(Some(())) // It had just been stopping because it reached the separator
+        }
+    }
+    ///
+    /// To manage the first call before the buffer is reading
+    pub fn next(&mut self) -> Result<bool> {
+        if self.first_read {
+            self.first_read = false;
+            // Manage case where the buffer is empty :
+            let sz = self.buf_extend.extend()?;
+            Ok(sz > 0)
+        } else {
+            let opt = self.next_part()?;
+            Ok(opt.is_some())
         }
     }
 

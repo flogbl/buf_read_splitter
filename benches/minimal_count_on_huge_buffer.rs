@@ -57,24 +57,24 @@ fn buf_read_splitter(buf_size: usize) {
     let mut buf = vec![0u8; buf_size];
 
     let mut nb_part_found = 0usize;
+    let mut nb_datas = 0usize;
 
-    while {
-        let sz = reader.read(&mut buf).unwrap();
-        if sz > 0 {
-            true
-        } else {
-            nb_part_found += 1;
-            match reader.next_part().unwrap() {
-                //Pass to the next part of the buffer
-                Some(_) => true, //There's a next part
-                None => false,   //End of the stream
-            }
+    while reader.next().unwrap() {
+        nb_part_found += 1;
+        let mut sz;
+        while {
+            sz = reader.read(&mut buf).unwrap();
+            sz > 0
+        } {
+            nb_datas += 1;
         }
-    } {}
+    }
+
     assert!(
         nb_part_found == nbr_of_iterations,
         "nb_found different of nbr_of_iterations ( {nb_part_found} != {nbr_of_iterations} )"
-    )
+    );
+    assert!(nb_datas > 0)
 }
 
 fn count_minimaliste(buf_size: usize) {
@@ -84,40 +84,42 @@ fn count_minimaliste(buf_size: usize) {
 
     let mut buf = vec![0u8; buf_size];
     let mut nb_sep_found = 0usize;
+    let mut nb_datas = 0usize;
 
     let mut pos_found = 0usize;
     let separator_bytes = separator.as_bytes();
 
+    let mut sz;
     while {
-        let sz = stream.read(&mut buf).unwrap();
-        if sz > 0 {
-            for &b in &buf[..sz] {
-                if b == separator_bytes[pos_found] {
-                    pos_found += 1;
-                    if pos_found == separator_bytes.len() {
-                        nb_sep_found += 1;
-                        pos_found = 0;
-                    }
-                } else if b == separator_bytes[0] {
-                    pos_found = 1;
-                    if pos_found == separator_bytes.len() {
-                        nb_sep_found += 1;
-                        pos_found = 0;
-                    }
-                } else {
-                    if pos_found > 0 {
-                        pos_found = 0;
-                    }
+        sz = stream.read(&mut buf).unwrap();
+        sz > 0
+    } {
+        for &b in &buf[..sz] {
+            if b == separator_bytes[pos_found] {
+                pos_found += 1;
+                if pos_found == separator_bytes.len() {
+                    nb_sep_found += 1;
+                    pos_found = 0;
+                }
+            } else if b == separator_bytes[0] {
+                pos_found = 1;
+                if pos_found == separator_bytes.len() {
+                    nb_sep_found += 1;
+                    pos_found = 0;
+                }
+            } else {
+                if pos_found > 0 {
+                    pos_found = 0;
                 }
             }
-            true
-        } else {
-            false
         }
-    } {}
+        nb_datas += sz;
+    }
 
     assert!(
         nb_sep_found + 1 == nbr_of_iterations,
         "nb_found different of nbr_of_iterations ({nb_sep_found}!={nbr_of_iterations}) "
-    )
+    );
+
+    assert!(nb_datas > 0)
 }

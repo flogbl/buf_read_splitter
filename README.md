@@ -1,50 +1,34 @@
 # buf_read_splitter
 
-## Presentation
 A stream reader with ability to read a stream until a defined pattern is reached (usually an array of [u8])
 
 I initially wrote this library because `read_until` accepts only one char as the separator.
 Priority is given to low memory and CPU usage (try `cargo bench` for more details)
 
-## By example
-The separator could be a simple one :
+Demonstation by an exemple, where stream is split by "<SEP>", each content is loaded the list `contents`
 ```rust
 use std::io::Read;
 use buf_read_splitter::{BufReadSplitter,MatchResult,Options,SimpleMatcher};
 
-// To simulate a stream of this content :
+// To simulate a stream
 let input = "First<SEP>Second<SEP>Third<SEP>Fourth<SEP>Fifth".to_string();
 let mut input_reader = input.as_bytes();
 
-// Create a reader that will end at each "<SEP>" :
+// Create a reader that will be separated by "<SEP>"
 let mut reader = BufReadSplitter::new(
-           &mut input_reader,
-           SimpleMatcher::new(b"<SEP>"),
-           Options::default(),
+   &mut input_reader,
+   SimpleMatcher::new(b"<SEP>"),
+   Options::default(),
 );
 
-// List of separate String will be listed in a Vector :
-let mut words = Vec::new();
+let mut contents = Vec::new();
 
-// Working variables :
-let mut word = String::new();
-let mut buf = vec![0u8; 100];
-
-while {
- let sz = reader.read(&mut buf).unwrap();
- if sz > 0 {
-    let to_str = String::from_utf8_lossy(&buf[..sz]);
-    word.push_str(&to_str);
-    true
- } else {
-    words.push(word.clone());
-    word.clear();
-    match reader.next_part().unwrap() {  //Pass to the next part of the buffer
-       Some(_) => true,     //There's a next part
-       None => false,       //End of the stream
-    }
- }
-} {}
+while reader.next().unwrap() {
+   let mut buf = Vec::new();
+   let _ = reader.read_to_end(&mut buf);
+   let str = String::from_utf8(buf).unwrap();
+   contents.push(str);
+}
 
 assert_eq!(&words[0], "First");
 assert_eq!(&words[1], "Second");
@@ -54,67 +38,65 @@ assert_eq!(&words[4], "Fifth");
 assert_eq!(words.len(), 5);
 ```
 \
-
-## Complex separator predicate
 And to manage more complexe pattern, the trait `Matcher` has to be implemented.\
 For example above a Matcher able to split a stream at each Mac, Unix or Windows end of line (note the use of the position in the separator determination function) :
 ```rust
 use buf_read_splitter::{
-       MatchResult,
-       Matcher,
-       };
+      MatchResult,
+      Matcher,
+      };
 
 struct AllEndOfLineMatcher {
-   prev_char: u8,
+  prev_char: u8,
 }
 impl AllEndOfLineMatcher {
-   pub fn new() -> Self {
-       Self { prev_char: 0 }
-   }
+  pub fn new() -> Self {
+      Self { prev_char: 0 }
+  }
 }
 impl Matcher for AllEndOfLineMatcher {
-   // This function is called at each byte read
-   //   `el_buf` contains the value of the byte
-   //   `pos` contains the position matched
-   fn sequel(&mut self, el_buf: u8, pos: usize) -> MatchResult {
-       if pos == 0 {
-           if el_buf == b'\r' || el_buf == b'\n' {
-               self.prev_char = el_buf;
-               MatchResult::NeedNext
-           } else {
-               MatchResult::Mismatch
-           }
-       } else if pos == 1 {
-           if el_buf == b'\n' && self.prev_char == b'\r' {
-               //We are on \r\n
-               MatchResult::Match(0, 0)
-           } else {
-               //Ignore the last byte (it's not a part of the end of line)
-               MatchResult::Match(0, 1)
-           }
-       } else {
-           //Unreachable
-           panic!("We can't reach this code since we just manage 2 positions")
-       }
-   }
+  // This function is called at each byte read
+  //   `el_buf` contains the value of the byte
+  //   `pos` contains the position matched
+  fn sequel(&mut self, el_buf: u8, pos: usize) -> MatchResult {
+      if pos == 0 {
+          if el_buf == b'\r' || el_buf == b'\n' {
+              self.prev_char = el_buf;
+              MatchResult::NeedNext
+          } else {
+              MatchResult::Mismatch
+          }
+      } else if pos == 1 {
+          if el_buf == b'\n' && self.prev_char == b'\r' {
+              //We are on \r\n
+              MatchResult::Match(0, 0)
+          } else {
+              //Ignore the last byte (it's not a part of the end of line)
+              MatchResult::Match(0, 1)
+          }
+      } else {
+          //Unreachable
+          panic!("We can't reach this code since we just manage 2 positions")
+      }
+  }
 
-   // This function is called at the end of the buffer, useful to manage partial cases
-   fn sequel_eos(&mut self, pos: usize) -> MatchResult {
-       if pos == 0 {
-           MatchResult::Match(0, 0) //Here the last char is \r or \n, at position 0
-       } else {
-           panic!("We can't reach this code since we just manage 2 positions")
-       }
-   }
+  // This function is called at the end of the buffer, useful to manage partial cases
+  fn sequel_eos(&mut self, pos: usize) -> MatchResult {
+      if pos == 0 {
+          MatchResult::Match(0, 0) //Here the last char is \r or \n, at position 0
+      } else {
+          panic!("We can't reach this code since we just manage 2 positions")
+      }
+  }
 }
 ```
 ...so the reader can be created with this code :
 ```rust
 let mut reader = BufReadSplitter::new(
-                            &mut input_reader,
-                            AllEndOfLineMatcher::new(),
-                            Options::default()
-                            );
+                           &mut input_reader,
+                           AllEndOfLineMatcher::new(),
+                           Options::default()
+                           );
 ```
 \
 The separator pattern can be changed on the fly by calling the "`matcher`" function :
@@ -122,10 +104,7 @@ The separator pattern can be changed on the fly by calling the "`matcher`" funct
 reader.matcher(SimpleMatcher::new(b"<CHANGE SEP>"))
 ```
 \
-
-## Options
-### Limit size of a stream part
-The stream part can be limited in size readed.\
+The buffer part can be limited in size readed.\
 For example to limit to 100 bytes :
 ```rust
 reader.set_limit_read(Some(100));
@@ -136,19 +115,16 @@ reader.set_limit_read(None);
 ```
 
 \
-### Skip part
 A call to "`.next_part()`" pass to the next part, skipping until the next part if the end was not reached
 
 \
-### Debug buffer content
 For debug purpose, you can activate the "log" features in the Cargo.toml (note that it slows down the processing) :
 ```rust
 [dependencies]
 buf_read_splitter = {"0.4", features = ["log"] }
 ```
 
-### License
+
 License: MIT
 
-### Versions
-[Semver](https://semver.org/) usage.
+License: MIT

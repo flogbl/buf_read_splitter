@@ -38,7 +38,7 @@ assert_eq!(&words[4], "Fifth");
 assert_eq!(words.len(), 5);
 ```
 \
-And to manage more complexe pattern, the trait `Matcher` has to be implemented.\
+To manage more complexe pattern, the trait `Matcher` has to be implemented.\
 For example above a Matcher able to split a stream at each Mac, Unix or Windows end of line (note the use of the position in the separator determination function) :
 ```rust
 use buf_read_splitter::{
@@ -113,9 +113,6 @@ reader.set_limit_read(Some(100));
 ```rust
 reader.set_limit_read(None);
 ```
-
-\
-A call to "`.next_part()`" pass to the next part, skipping until the next part if the end was not reached
 
 \
 For debug purpose, you can activate the "log" features in the Cargo.toml (note that it slows down the processing) :

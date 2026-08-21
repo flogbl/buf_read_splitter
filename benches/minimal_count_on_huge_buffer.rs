@@ -16,9 +16,14 @@ const CONTENT_LEN: usize = 10;
 
 pub fn bench() {
     // Report header
-    println!("|{}|", "-".repeat(35));
-    println!("|  {:>6}   |  {:>6}   |  {:>6}   |", "sz", "buf", "min");
-    println!("|{}|", "-".repeat(35));
+    println!("|{}|", "-".repeat(47));
+    println!("|{:^47}|", "* CPU Time *");
+    println!("|{}|", "-".repeat(47));
+    println!(
+        "|  {:>6}   |  {:>6}   |  {:>6}   |  {:>6}   |",
+        "sz", "buf", "min", "allmem"
+    );
+    println!("|{}|", "-".repeat(47));
 
     // Init
     let mut proc_info = ProcInfo::new();
@@ -27,24 +32,30 @@ pub fn bench() {
         let cpu1_before = proc_info.cpu_time();
         buf_read_splitter(buf_size);
         let cpu1_after = proc_info.cpu_time();
+
         let cpu2_before = proc_info.cpu_time();
         count_minimaliste(buf_size);
         let cpu2_after = proc_info.cpu_time();
 
+        let cpu3_before = proc_info.cpu_time();
+        all_in_memory(buf_size);
+        let cpu3_after = proc_info.cpu_time();
+
         println!(
-            "| {:>9.3} | {:>6.3} ms | {:>6.3} ms |",
+            "| {:>9.3} | {:>6.3} ms | {:>6.3} ms | {:>6.3} ms |",
             buf_size,
             cpu1_after - cpu1_before,
-            cpu2_after - cpu2_before
+            cpu2_after - cpu2_before,
+            cpu3_after - cpu3_before
         );
     }
 
     // Report footer
-    println!("|{}|", "-".repeat(35));
+    println!("|{}|", "-".repeat(47));
 }
 
 fn buf_read_splitter(buf_size: usize) {
-    let nbr_of_iterations = 10_000_000 / CONTENT_LEN;
+    let nbr_of_iterations = 100_000_000 / CONTENT_LEN;
     let separator = "<SEP>";
     let mut stream = StreamGenerator::new(CONTENT_LEN, separator, nbr_of_iterations);
 
@@ -78,7 +89,7 @@ fn buf_read_splitter(buf_size: usize) {
 }
 
 fn count_minimaliste(buf_size: usize) {
-    let nbr_of_iterations = 10_000_000 / CONTENT_LEN;
+    let nbr_of_iterations = 100_000_000 / CONTENT_LEN;
     let separator = "<SEP>";
     let mut stream = StreamGenerator::new(CONTENT_LEN, separator, nbr_of_iterations);
 
@@ -118,6 +129,31 @@ fn count_minimaliste(buf_size: usize) {
 
     assert!(
         nb_sep_found + 1 == nbr_of_iterations,
+        "nb_found different of nbr_of_iterations ({nb_sep_found}!={nbr_of_iterations}) "
+    );
+
+    assert!(nb_datas > 0)
+}
+
+fn all_in_memory(buf_size: usize) {
+    let nbr_of_iterations = 100_000_000 / CONTENT_LEN;
+    let separator = "<SEP>";
+    let mut stream = StreamGenerator::new(CONTENT_LEN, separator, nbr_of_iterations);
+
+    let mut buf = vec![0u8; buf_size];
+    let _ = stream.read_to_end(&mut buf);
+    let text = String::from_utf8(buf).unwrap();
+
+    let mut nb_sep_found = 0usize;
+    let mut nb_datas = 0usize;
+
+    for s in text.split(separator) {
+        nb_sep_found += 1;
+        nb_datas += s.len();
+    }
+
+    assert!(
+        nb_sep_found == nbr_of_iterations,
         "nb_found different of nbr_of_iterations ({nb_sep_found}!={nbr_of_iterations}) "
     );
 

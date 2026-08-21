@@ -121,7 +121,7 @@
 //!```
 //!
 //!\
-//!For debug purpose, you can activate the "log" features in the Cargo.toml (note that it slows down the processing) :
+//!For debug purpose, a "log" features is activable in the Cargo.toml (slows down the processing) :
 //!```ignore
 //![dependencies]
 //!buf_read_splitter = {"0.4", features = ["log"] }

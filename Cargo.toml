@@ -1,6 +1,6 @@
 [package]
 name = "buf_read_splitter"
-version = "0.4.x"
+#version = "0.4.x"
 edition = "2021"
 description = "A stream buffer reader with ability to split the stream until a defined pattern is reached (usually an array of [u8])"
 keywords = ["stream","buffer","split","read_until"]

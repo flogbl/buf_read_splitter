@@ -28,12 +28,12 @@
 //!    contents.push(str);
 //!}
 //!
-//!assert_eq!(&words[0], "First");
-//!assert_eq!(&words[1], "Second");
-//!assert_eq!(&words[2], "Third");
-//!assert_eq!(&words[3], "Fourth");
-//!assert_eq!(&words[4], "Fifth");
-//!assert_eq!(words.len(), 5);
+//!assert_eq!(&contents[0], "First");
+//!assert_eq!(&contents[1], "Second");
+//!assert_eq!(&contents[2], "Third");
+//!assert_eq!(&contents[3], "Fourth");
+//!assert_eq!(&contents[4], "Fifth");
+//!assert_eq!(contents.len(), 5);
 //!```
 //!\
 //!To manage more complexe pattern, the trait `Matcher` has to be implemented.\

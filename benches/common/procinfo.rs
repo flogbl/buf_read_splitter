@@ -1,10 +1,10 @@
 use sysinfo::System;
 
-pub struct ProcInfo {
+pub struct Cpu {
     system: System,
 }
 
-impl ProcInfo {
+impl Cpu {
     pub fn new() -> Self {
         let system = System::new_all();
         Self { system }

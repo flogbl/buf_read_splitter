@@ -22,9 +22,18 @@ thiserror = "2"
 
 [dev-dependencies]
 sysinfo = "0.39"
+core_affinity = "0.8"
 
 [[bench]]
-name = "main"
+name = "bench_cpu"
+harness = false
+
+#[[bench]]
+#name = "bench_one_cpu"
+#harness = false
+
+[[bench]]
+name = "bench_malloc"
 harness = false
 
 # To use flamegraph
